@@ -1,0 +1,26 @@
+# =============================================================================
+# English Lab - configuracion de EJEMPLO (commitable).
+# NO pongas secretos reales aqui. Copia este archivo a `application.properties`
+# (que esta ignorado por Git) y completa los valores reales en el entorno.
+# =============================================================================
+
+# --- Servidor ---
+server.port=8080
+
+# --- Datasource PostgreSQL (puerto 5432) ---
+spring.datasource.url=jdbc:postgresql://localhost:5432/englishlab
+spring.datasource.username=${DB_USERNAME:englishlab}
+spring.datasource.password=${DB_PASSWORD:englishlab}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# --- JPA / Hibernate (schema gestionado SOLO por Flyway) ---
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.open-in-view=false
+
+# --- Flyway ---
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+
+# --- JWT (secreto fuera de Git; usar variable de entorno en produccion) ---
+app.jwt.secret=${JWT_SECRET:cambia-este-secreto-por-uno-de-256-bits-minimo}
+app.jwt.expiration-ms=${JWT_EXPIRATION_MS:3600000}
