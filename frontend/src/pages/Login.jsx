@@ -1,58 +1,89 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 import Input from '../components/Input.jsx';
-import { validarCorreo, validarContrasena } from '../lib/validaciones.js';
+import { Spinner } from '../components/ui.jsx';
+import client, { extractApiError, SESSION_EXPIRED_KEY } from '../api/client.js';
+import { useAuth, homePathForRole } from '../auth/AuthContext.jsx';
+import { email as validateEmail, required } from '../lib/validators.js';
 
+/** Sin selector de rol: el rol lo devuelve el backend y decide el panel al que
+ *  se redirige. */
 export default function Login() {
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [errors, setErrors] = useState({});
-  const [enviando, setEnviando] = useState(false);
-  const [mensaje, setMensaje] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
-  function actualizar(event) {
-    const { name, value } = event.target;
-    setForm((actual) => ({ ...actual, [name]: value }));
-    setErrors((actual) => ({ ...actual, [name]: '' }));
-    setMensaje('');
-  }
+  const [values, setValues] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({ email: '', password: '' });
+  const [touched, setTouched] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  function revisar(event) {
-    const { name, value } = event.target;
-    const error = name === 'email' ? validarCorreo(value) : validarContrasena(value);
-    setErrors((actual) => ({ ...actual, [name]: error }));
-  }
-
-  async function iniciarSesion(event) {
-    event.preventDefault();
-    const nuevosErrores = {
-      email: validarCorreo(form.email),
-      password: validarContrasena(form.password),
-    };
-    setErrors(nuevosErrores);
-    if (Object.values(nuevosErrores).some(Boolean)) return;
-
-    setEnviando(true);
-    setMensaje('');
+  // El interceptor 401 deja una marca antes de redirigir; se consume una sola vez.
+  useEffect(() => {
     try {
-      const respuesta = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email.trim(), password: form.password }),
-      });
-      const datos = await respuesta.json().catch(() => ({}));
-      if (!respuesta.ok) {
-        setMensaje(
-          respuesta.status === 401
-            ? 'Correo o contraseña incorrectos.'
-            : datos.detail || 'No fue posible iniciar sesión. Inténtalo de nuevo.'
-        );
-        return;
+      if (window.sessionStorage.getItem(SESSION_EXPIRED_KEY) === '1') {
+        window.sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+        setSessionExpired(true);
       }
-      setMensaje(datos.token ? 'Credenciales verificadas correctamente.' : 'Respuesta inesperada del servidor.');
     } catch {
-      setMensaje('No fue posible conectar con el servidor. Inténtalo más tarde.');
+      /* sessionStorage no disponible: sin aviso */
+    }
+  }, []);
+
+  const rules = {
+    email: (v) => required(v, 'El correo') || validateEmail(v),
+    password: (v) => required(v, 'La contraseña'),
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setValues((v) => ({ ...v, [name]: value }));
+    if (touched[name]) setErrors((errs) => ({ ...errs, [name]: rules[name](value) }));
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((t) => ({ ...t, [name]: true }));
+    setErrors((errs) => ({ ...errs, [name]: rules[name](value) }));
+  };
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const nextErrors = {};
+    for (const key of Object.keys(rules)) nextErrors[key] = rules[key](values[key]);
+    setErrors(nextErrors);
+    setTouched({ email: true, password: true });
+    if (Object.values(nextErrors).some(Boolean)) return;
+
+    setBusy(true);
+    setSubmitError('');
+    try {
+      const { data } = await client.post('/auth/login', {
+        email: values.email.trim(),
+        password: values.password,
+      });
+      login(data.token, data.user);
+      const from = location.state?.from;
+      navigate(from || homePathForRole(data.user?.role), { replace: true });
+    } catch (err) {
+      const apiError = extractApiError(err);
+      const fieldErrors = {};
+      apiError.fieldErrors.forEach((f) => {
+        if (f.field in values) fieldErrors[f.field] = f.message;
+      });
+      setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      if (!Object.keys(fieldErrors).length) {
+        setSubmitError(
+          apiError.status === 401
+            ? 'Credenciales inválidas. Revisa tu correo y contraseña.'
+            : apiError.detail
+        );
+      }
     } finally {
-      setEnviando(false);
+      setBusy(false);
     }
   }
 
@@ -60,18 +91,22 @@ export default function Login() {
     <AuthLayout>
       <h1>Bienvenido de nuevo.</h1>
       <p className="muted">Ingresa para continuar tu aprendizaje.</p>
-
-      <form onSubmit={iniciarSesion} noValidate>
+      {sessionExpired ? (
+        <div className="notice" role="status" style={{ margin: '4px 0 16px' }}>
+          <span>Tu sesión expiró. Inicia sesión de nuevo.</span>
+        </div>
+      ) : null}
+      <form onSubmit={handleSubmit} noValidate>
         <Input
           label="Correo electrónico"
           name="email"
           type="email"
           placeholder="nombre@correo.com"
           autoComplete="email"
-          value={form.email}
-          onChange={actualizar}
-          onBlur={revisar}
-          error={errors.email}
+          value={values.email}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          error={touched.email ? errors.email : ''}
         />
         <Input
           label="Contraseña"
@@ -79,22 +114,28 @@ export default function Login() {
           type="password"
           placeholder="Tu contraseña"
           autoComplete="current-password"
-          value={form.password}
-          onChange={actualizar}
-          onBlur={revisar}
-          error={errors.password}
+          value={values.password}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          error={touched.password ? errors.password : ''}
         />
-        <p className="help">
-          ¿Necesitas ayuda? <a href="/recuperar">Recuperar contraseña</a>
-        </p>
-        {mensaje && <p className="form-status" role="status">{mensaje}</p>}
-        <button className="btn wide" type="submit" disabled={enviando}>
-          {enviando ? 'Ingresando…' : 'Iniciar sesión'}
+        <div className="help">
+          <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
+        </div>
+        {submitError ? <p className="form-status" role="alert">{submitError}</p> : null}
+        <button className="btn wide" type="submit" disabled={busy}>
+          {busy ? 'Ingresando…' : 'Iniciar sesión'}
         </button>
       </form>
-
+      {busy ? (
+        <div className="mt" style={{ display: 'flex', justifyContent: 'center' }}>
+          <Spinner small label="" />
+        </div>
+      ) : null}
       <div className="auth-links">
-        <span>¿No tienes cuenta? <a href="/registro">Regístrate</a></span>
+        <span>
+          ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+        </span>
       </div>
     </AuthLayout>
   );

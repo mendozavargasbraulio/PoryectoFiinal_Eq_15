@@ -10,6 +10,8 @@ import axios from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
+export const SESSION_EXPIRED_KEY = 'englishlab.sessionExpired';
+
 export const TOKEN_KEY = 'englishlab.auth';
 
 export function readStoredAuth() {
