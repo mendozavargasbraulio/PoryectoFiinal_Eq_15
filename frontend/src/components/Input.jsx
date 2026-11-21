@@ -1,6 +1,5 @@
 /**
- * Input con etiqueta, ayuda y MENSAJE DE ERROR DEBAJO DEL CAMPO (react-ui-rules).
- * El error se muestra mientras se escribe y en blur.
+ * Input con etiqueta, ayuda y error debajo del propio campo, en vivo y en blur.
  */
 export default function Input({
   label,
@@ -13,6 +12,7 @@ export default function Input({
   value,
   onChange,
   onBlur,
+  disabled = false,
   className = '',
 }) {
   const invalid = Boolean(error);
@@ -31,6 +31,7 @@ export default function Input({
         value={value}
         onChange={onChange}
         onBlur={onBlur}
+        disabled={disabled}
         aria-invalid={invalid}
         aria-describedby={invalid ? `${name}-error` : undefined}
       />
