@@ -1,6 +1,6 @@
 package com.englishlab.dto.user;
 
-import com.englishlab.model.entity.RoleName;
+import com.englishlab.model.entity.Role.RoleName;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
