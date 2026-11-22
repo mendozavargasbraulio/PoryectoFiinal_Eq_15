@@ -82,6 +82,13 @@ public class ActivityService {
         return new PageResponse<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 
+    @Transactional(readOnly = true)
+    public ActivityAdminResponse getById(Long id) {
+        Activity activity = activityRepository.findWithDetailsById(id)
+                .orElseThrow(() -> new NotFoundException("Actividad no encontrada"));
+        return toResponse(activity);
+    }
+
     @Transactional
     public ActivityAdminResponse create(ActivityRequest request) {
         Objective objective = objectiveRepository.findById(request.objectiveId())
@@ -239,6 +246,7 @@ public class ActivityService {
                 activity.getSkill(),
                 activity.getTitle(),
                 activity.getCategory() == null ? null : activity.getCategory().getId(),
+                activity.getCategory() == null ? null : activity.getCategory().getName(),
                 parseContent(activity.getContent()));
     }
 

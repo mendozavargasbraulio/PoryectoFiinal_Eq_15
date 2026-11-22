@@ -102,7 +102,7 @@ public class AdminUserService {
         if (request.password() != null && !request.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
-        if (request.teacherId() != null) {
+        if (request.teacherId() != null && role.getName() == RoleName.STUDENT) {
             user.setTeacher(resolveTeacher(request.teacherId()));
         } else {
             user.setTeacher(null);
@@ -111,7 +111,10 @@ public class AdminUserService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Long actorId) {
+        if (actorId != null && actorId.equals(id)) {
+            throw new BusinessRuleException("No puedes eliminar tu propia cuenta");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         userRepository.delete(user);

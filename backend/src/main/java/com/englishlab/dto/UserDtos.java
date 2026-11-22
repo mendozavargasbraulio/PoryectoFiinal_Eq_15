@@ -66,4 +66,17 @@ public final class UserDtos {
     ) {}
 
     public record StudentResponse(Long id, String name, String email, Instant createdAt) {}
+
+    /** Resumen paginado del progreso y actividades de cada estudiante del TEACHER. */
+    public record StudentOverviewResponse(
+            Long id,
+            String name,
+            String email,
+            double averageMastery,
+            int masteredObjectives,
+            int totalObjectives,
+            int totalAttempts,
+            long completedAssignments,
+            long pendingAssignments
+    ) {}
 }
