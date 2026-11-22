@@ -1,4 +1,4 @@
-package com.englishlab.dto.common;
+package com.englishlab.dto;
 
 import java.util.List;
 

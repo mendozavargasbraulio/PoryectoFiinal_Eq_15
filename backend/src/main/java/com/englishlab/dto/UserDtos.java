@@ -1,4 +1,4 @@
-package com.englishlab.dto.user;
+package com.englishlab.dto;
 
 import com.englishlab.model.entity.Role.RoleName;
 import jakarta.validation.constraints.Email;
@@ -57,4 +57,13 @@ public final class UserDtos {
             String phone,
             Instant createdAt
     ) {}
+
+    /** Vinculación de un estudiante a un TEACHER por email. */
+    public record AssignStudentRequest(
+            @NotBlank(message = "El email es obligatorio")
+            @Email(message = "El email no es válido")
+            String email
+    ) {}
+
+    public record StudentResponse(Long id, String name, String email, Instant createdAt) {}
 }
