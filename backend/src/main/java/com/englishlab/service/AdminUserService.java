@@ -1,8 +1,8 @@
 package com.englishlab.service;
 
-import com.englishlab.dto.common.PageResponse;
-import com.englishlab.dto.user.UserDtos.UserAdminRequest;
-import com.englishlab.dto.user.UserDtos.UserAdminResponse;
+import com.englishlab.dto.PageResponse;
+import com.englishlab.dto.UserDtos.UserAdminRequest;
+import com.englishlab.dto.UserDtos.UserAdminResponse;
 import com.englishlab.exception.AppExceptions.BadRequestException;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
