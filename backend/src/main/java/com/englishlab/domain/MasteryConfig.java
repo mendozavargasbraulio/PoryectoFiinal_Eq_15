@@ -20,9 +20,8 @@ public final class MasteryConfig {
     /** Número de intentos recientes usados para el promedio de rendimiento reciente. */
     public static final int RECENT_WINDOW = 5;
 
-    // ASSUMPTION: el modo RETO pesa en el dominio con estos valores. Se califican igual con
-    // GradingService, pero la puntuación que entra en `recent` se transforma según el modo.
-    // En NORMAL se mantiene lo de siempre: correcta 1.0, incorrecta 0.0 (lo emite GradingService).
+    // En modo RETO se califica igual con GradingService, pero la puntuación que entra
+    // en `recent` se ajusta según el modo. En NORMAL sigue siendo correcta 1.0, incorrecta 0.0.
 
     /** Puntuación de un intento correcto en modo RETO. */
     public static final double CHALLENGE_CORRECT_SCORE = 1.0;

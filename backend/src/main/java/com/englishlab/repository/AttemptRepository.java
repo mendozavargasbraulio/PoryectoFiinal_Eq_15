@@ -3,12 +3,20 @@ package com.englishlab.repository;
 import com.englishlab.model.entity.Attempt;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AttemptRepository extends JpaRepository<Attempt, Long> {
+
+    @EntityGraph(attributePaths = {"activity", "activity.objective", "user"})
+    Optional<Attempt> findWithDetailsById(Long id);
+
+    @EntityGraph(attributePaths = {"activity", "activity.objective", "user"})
+    Optional<Attempt> findFirstByAssignmentIdAndUserIdOrderByAttemptedAtDescIdDesc(Long assignmentId, Long userId);
 
     /** Scores de los últimos intentos (más recientes primero) del alumno en un objetivo. */
     @Query("select a.score from Attempt a "

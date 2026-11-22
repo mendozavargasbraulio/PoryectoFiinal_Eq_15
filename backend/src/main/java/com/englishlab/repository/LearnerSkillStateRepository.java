@@ -10,5 +10,7 @@ public interface LearnerSkillStateRepository extends JpaRepository<LearnerSkillS
 
     List<LearnerSkillState> findByUserId(Long userId);
 
+    List<LearnerSkillState> findByUserIdIn(List<Long> userIds);
+
     Optional<LearnerSkillState> findByUserIdAndObjectiveId(Long userId, Long objectiveId);
 }

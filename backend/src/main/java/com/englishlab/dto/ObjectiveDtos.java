@@ -38,14 +38,17 @@ public final class ObjectiveDtos {
     /** Sesión de práctica: ids de actividad en orden; el detalle se pide aparte, sin clave. */
     public record PracticeSessionResponse(List<Long> activityIds) {}
 
-    /** Dominio de un alumno en un objetivo (vista del TEACHER). */
+    /** Dominio y estado de un alumno en un objetivo (vista del TEACHER). */
     public record ProgressResponse(
             Long objectiveId,
             String code,
             String name,
             String cefrLevel,
             String skill,
-            double mastery
+            double mastery,
+            int attemptsCount,
+            int correctCount,
+            ObjectiveState state
     ) {}
 
     /**
