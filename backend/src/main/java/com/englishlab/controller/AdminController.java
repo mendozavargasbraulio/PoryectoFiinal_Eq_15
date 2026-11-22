@@ -5,6 +5,7 @@ import com.englishlab.dto.ActivityDtos.CategoryResponse;
 import com.englishlab.dto.PageResponse;
 import com.englishlab.dto.UserDtos.UserAdminRequest;
 import com.englishlab.dto.UserDtos.UserAdminResponse;
+import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.AdminUserService;
 import com.englishlab.service.CategoryService;
 import com.englishlab.util.PageableFactory;
@@ -13,6 +14,7 @@ import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,8 +73,10 @@ public class AdminController {
 
     @DeleteMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        adminUserService.delete(id);
+    public ResponseEntity<Void> deleteUser(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long id) {
+        adminUserService.delete(id, principal.id());
         return ResponseEntity.noContent().build();
     }
 

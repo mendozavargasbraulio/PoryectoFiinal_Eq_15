@@ -6,9 +6,12 @@ import com.englishlab.dto.PageResponse;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
 import com.englishlab.model.entity.Category;
+import com.englishlab.repository.ActivityRepository;
 import com.englishlab.repository.CategoryRepository;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -17,14 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * CRUD de categorías. Escritura ADMIN (seguridad en el controller); lectura ADMIN+TEACHER.
+ * El conteo de actividades se calcula con una sola consulta agregada por página (sin N+1).
  */
 @Service
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final ActivityRepository activityRepository;
 
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, ActivityRepository activityRepository) {
         this.categoryRepository = categoryRepository;
+        this.activityRepository = activityRepository;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +45,19 @@ public class CategoryService {
                     cb.like(cb.lower(root.get("description")), like));
         };
         Page<Category> page = categoryRepository.findAll(spec, pageable);
-        List<CategoryResponse> content = page.getContent().stream().map(this::toResponse).toList();
+        List<Category> categories = page.getContent();
+
+        Map<Long, Long> counts = new HashMap<>();
+        if (!categories.isEmpty()) {
+            List<Long> ids = categories.stream().map(Category::getId).toList();
+            for (Object[] row : activityRepository.countByCategoryIds(ids)) {
+                counts.put((Long) row[0], ((Number) row[1]).longValue());
+            }
+        }
+
+        List<CategoryResponse> content = categories.stream()
+                .map(c -> toResponse(c, counts.getOrDefault(c.getId(), 0L)))
+                .toList();
         return new PageResponse<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 
@@ -52,7 +70,7 @@ public class CategoryService {
         Category category = new Category();
         category.setName(name);
         category.setDescription(request.description());
-        return toResponse(categoryRepository.save(category));
+        return toResponse(categoryRepository.save(category), 0L);
     }
 
     @Transactional
@@ -65,7 +83,7 @@ public class CategoryService {
         }
         category.setName(name);
         category.setDescription(request.description());
-        return toResponse(category);
+        return toResponse(category, activityRepository.countByCategoryId(id));
     }
 
     @Transactional
@@ -75,7 +93,7 @@ public class CategoryService {
         categoryRepository.delete(category);
     }
 
-    private CategoryResponse toResponse(Category category) {
-        return new CategoryResponse(category.getId(), category.getName(), category.getDescription());
-    }
+    private CategoryResponse toResponse(Category category, long activitiesCount) {
+        return new CategoryResponse(category.getId(), category.getName(), category.getDescription(), activitiesCount);
+/*  */    }
 }

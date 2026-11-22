@@ -16,15 +16,6 @@ public final class ActivityDtos {
     private ActivityDtos() {
     }
 
-    /** Contenido completo para ADMIN/TEACHER (incluye la clave de respuesta). */
-    public record ActivityAdminDto(
-            String prompt,
-            List<ActivityOption> options,
-            String answer,
-            List<String> accepted,
-            String explanation
-    ) {}
-
     /** Vista ADMIN/TEACHER: metadatos + contenido con la clave de respuesta. */
     public record ActivityAdminResponse(
             Long id,
@@ -34,6 +25,7 @@ public final class ActivityDtos {
             String skill,
             String title,
             Long categoryId,
+            String categoryName,
             JsonNode content
     ) {}
 
@@ -98,5 +90,5 @@ public final class ActivityDtos {
             String description
     ) {}
 
-    public record CategoryResponse(Long id, String name, String description) {}
+    public record CategoryResponse(Long id, String name, String description, long activitiesCount) {}
 }

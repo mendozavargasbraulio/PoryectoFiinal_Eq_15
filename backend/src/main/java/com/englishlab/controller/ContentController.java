@@ -55,6 +55,11 @@ public class ContentController {
                 PageableFactory.of(page, size, sort, ACTIVITY_SORT, "id")));
     }
 
+    @GetMapping("/activities/{id}")
+    public ResponseEntity<ActivityAdminResponse> getActivity(@PathVariable Long id) {
+        return ResponseEntity.ok(activityService.getById(id));
+    }
+
     @PostMapping("/activities")
     public ResponseEntity<ActivityAdminResponse> createActivity(@Valid @RequestBody ActivityRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(activityService.create(request));
