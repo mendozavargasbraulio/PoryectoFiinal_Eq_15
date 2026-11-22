@@ -5,6 +5,7 @@ import com.englishlab.dto.AssignmentDtos.AssignmentResponse;
 import com.englishlab.dto.ObjectiveDtos.ProgressResponse;
 import com.englishlab.dto.PageResponse;
 import com.englishlab.dto.UserDtos.AssignStudentRequest;
+import com.englishlab.dto.UserDtos.StudentOverviewResponse;
 import com.englishlab.dto.UserDtos.StudentResponse;
 import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.AssignmentService;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TeacherController {
 
     private static final Set<String> STUDENT_SORT = Set.of("id", "name", "email", "createdAt");
+    private static final Set<String> ASSIGNMENT_SORT = Set.of("id", "assignedAt", "completedAt", "status");
 
     private final TeacherStudentService teacherStudentService;
     private final AssignmentService assignmentService;
@@ -61,11 +63,33 @@ public class TeacherController {
                 PageableFactory.of(page, size, sort, STUDENT_SORT, "id")));
     }
 
+    @GetMapping("/students/overview")
+    public ResponseEntity<PageResponse<StudentOverviewResponse>> studentsOverview(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(required = false) String text,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        return ResponseEntity.ok(teacherStudentService.listOverview(principal.id(), text,
+                PageableFactory.of(page, size, sort, STUDENT_SORT, "name")));
+    }
+
     @GetMapping("/students/{id}/progress")
     public ResponseEntity<List<ProgressResponse>> studentProgress(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @PathVariable Long id) {
         return ResponseEntity.ok(assignmentService.progress(principal.id(), id));
+    }
+
+    @GetMapping("/assignments")
+    public ResponseEntity<PageResponse<AssignmentResponse>> assignments(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        return ResponseEntity.ok(assignmentService.teacherAssignments(principal.id(), status,
+                PageableFactory.of(page, size, sort, ASSIGNMENT_SORT, "assignedAt")));
     }
 
     @PostMapping("/assignments")

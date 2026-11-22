@@ -28,11 +28,14 @@ public final class AssignmentDtos {
             Instant completedAt
     ) {}
 
-    /** Asignación vista por el alumno, con la actividad sin clave de respuesta. */
+    /** Asignación vista por el alumno, con metadatos y actividad sin clave de respuesta. */
     public record StudentAssignmentResponse(
             Long assignmentId,
             Long activityId,
             String status,
-            ActivityDtos.ActivityStudentDto activity
+            Instant assignedAt,
+            Instant completedAt,
+            String teacherName,
+            ActivityDtos.ActivityStudentDetailDto activity
     ) {}
 }

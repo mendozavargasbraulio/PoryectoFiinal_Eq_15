@@ -3,6 +3,8 @@ package com.englishlab.service;
 import com.englishlab.domain.MasteryConfig;
 import com.englishlab.domain.MasteryConfig.AttemptMode;
 import com.englishlab.domain.MasteryService;
+import com.englishlab.dto.ActivityDtos.ActivityStudentDto;
+import com.englishlab.dto.AttemptDtos.AttemptDetailResponse;
 import com.englishlab.dto.AttemptDtos.AttemptRequest;
 import com.englishlab.dto.AttemptDtos.AttemptResponse;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
@@ -81,7 +83,7 @@ public class AttemptService {
                 throw new AccessDeniedException("La asignación no pertenece al estudiante");
             }
             if (assignment.getStatus() != AssignmentStatus.PENDING) {
-                throw new AccessDeniedException("La asignación ya fue completada");
+                throw new BusinessRuleException("La asignación ya fue completada");
             }
             if (!assignment.getActivity().getId().equals(request.activityId())) {
                 throw new BusinessRuleException("La actividad no corresponde a la asignación");
@@ -115,7 +117,7 @@ public class AttemptService {
         attempt.setCorrect(correct);
         attempt.setScore(BigDecimal.valueOf(score));
         attempt.setAttemptedAt(Instant.now());
-        attemptRepository.save(attempt);
+        attempt = attemptRepository.save(attempt);
 
         Objective objective = activity.getObjective();
         // El score entra tal cual en el dominio: en RETO un fallo (-0.5) puede bajarlo.
@@ -130,7 +132,62 @@ public class AttemptService {
         String solution = activityContentService.extractSolution(type, content);
         String explanation = activityContentService.extractExplanation(content);
 
-        return new AttemptResponse(correct, score, solution, explanation, mastery);
+        return new AttemptResponse(attempt.getId(), correct, score, solution, explanation, mastery);
+    }
+
+    /** Detalle de un intento ya evaluado perteneciente al estudiante autenticado. */
+    @Transactional(readOnly = true)
+    public AttemptDetailResponse getMyAttempt(Long userId, Long attemptId) {
+        Attempt attempt = attemptRepository.findWithDetailsById(attemptId)
+                .orElseThrow(() -> new NotFoundException("Intento no encontrado"));
+        if (!attempt.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("El intento no pertenece al estudiante");
+        }
+        return toDetailResponse(userId, attempt);
+    }
+
+    /** Resultado de una asignación ya completada por el estudiante autenticado. */
+    @Transactional(readOnly = true)
+    public AttemptDetailResponse getAssignmentResult(Long userId, Long assignmentId) {
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new NotFoundException("Asignación no encontrada"));
+        if (!assignment.getStudent().getId().equals(userId)) {
+            throw new AccessDeniedException("La asignación no pertenece al estudiante");
+        }
+        if (assignment.getStatus() != AssignmentStatus.COMPLETED) {
+            throw new BusinessRuleException("La asignación todavía está pendiente");
+        }
+        Attempt attempt = attemptRepository
+                .findFirstByAssignmentIdAndUserIdOrderByAttemptedAtDescIdDesc(assignmentId, userId)
+                .orElseThrow(() -> new NotFoundException("No se encontró el resultado de esta asignación"));
+        return toDetailResponse(userId, attempt);
+    }
+
+    private AttemptDetailResponse toDetailResponse(Long userId, Attempt attempt) {
+        Activity activity = attempt.getActivity();
+        ActivityType type = ActivityType.valueOf(activity.getType());
+        ActivityStudentDto studentView = activityContentService.toStudentDto(activity.getType(), activity.getContent());
+        JsonNode content = activityContentService.parse(activity.getContent());
+        String solution = activityContentService.extractSolution(type, content);
+        String explanation = activityContentService.extractExplanation(content);
+        double mastery = learnerSkillStateRepository
+                .findByUserIdAndObjectiveId(userId, activity.getObjective().getId())
+                .map(state -> state.getMastery().doubleValue())
+                .orElse(MasteryConfig.DEFAULT_MASTERY);
+
+        return new AttemptDetailResponse(
+                attempt.getId(),
+                activity.getId(),
+                activity.getTitle(),
+                activity.getType(),
+                studentView.options(),
+                attempt.getUserAnswer(),
+                attempt.isCorrect(),
+                attempt.getScore().doubleValue(),
+                solution,
+                explanation,
+                masteryService.roundMastery(mastery),
+                attempt.getAttemptedAt());
     }
 
     /** Calcula el nuevo dominio (recent + historical) y hace el upsert de learner_skill_state. */

@@ -1,12 +1,17 @@
 package com.englishlab.service;
 
 import com.englishlab.domain.MasteryConfig;
+import com.englishlab.domain.MasteryConfig.ObjectiveState;
 import com.englishlab.domain.MasteryService;
+import com.englishlab.domain.MasteryService.ObjectiveDomain;
+import com.englishlab.dto.ActivityDtos.ActivityStudentDetailDto;
+import com.englishlab.dto.ActivityDtos.ActivityStudentDto;
 import com.englishlab.dto.AssignmentDtos.AssignmentCreateRequest;
 import com.englishlab.dto.AssignmentDtos.AssignmentResponse;
 import com.englishlab.dto.AssignmentDtos.StudentAssignmentResponse;
 import com.englishlab.dto.ObjectiveDtos.ProgressResponse;
 import com.englishlab.dto.PageResponse;
+import com.englishlab.exception.AppExceptions.BadRequestException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
 import com.englishlab.model.entity.Activity;
 import com.englishlab.model.entity.Assignment;
@@ -21,7 +26,10 @@ import com.englishlab.repository.ObjectiveRepository;
 import com.englishlab.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -81,6 +89,18 @@ public class AssignmentService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<AssignmentResponse> teacherAssignments(Long teacherId, String status, Pageable pageable) {
+        Page<Assignment> page;
+        if (status != null && !status.isBlank()) {
+            page = assignmentRepository.findByTeacherIdAndStatus(teacherId, parseStatus(status), pageable);
+        } else {
+            page = assignmentRepository.findByTeacherId(teacherId, pageable);
+        }
+        List<AssignmentResponse> content = page.getContent().stream().map(this::toResponse).toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<StudentAssignmentResponse> myAssignments(Long studentId, Pageable pageable) {
         Page<Assignment> page = assignmentRepository.findByStudentId(studentId, pageable);
         List<StudentAssignmentResponse> content = page.getContent().stream()
@@ -97,22 +117,56 @@ public class AssignmentService {
             throw new AccessDeniedException("El estudiante no está vinculado a este profesor");
         }
 
-        List<Objective> objectives = objectiveRepository.findAllByOrderByIdAsc();
-        Map<Long, Double> mastery = objectives.stream()
-                .collect(Collectors.toMap(Objective::getId, o -> MasteryConfig.DEFAULT_MASTERY));
-        for (LearnerSkillState state : learnerSkillStateRepository.findByUserId(studentId)) {
-            mastery.put(state.getObjectiveId(), state.getMastery().doubleValue());
-        }
+        List<Objective> objectives = objectiveRepository.findAllWithPrerequisites();
+        Map<Long, LearnerSkillState> states = learnerSkillStateRepository.findByUserId(studentId).stream()
+                .collect(Collectors.toMap(LearnerSkillState::getObjectiveId, s -> s));
 
-        return objectives.stream()
-                .map(o -> new ProgressResponse(
-                        o.getId(),
-                        o.getCode(),
-                        o.getName(),
-                        o.getCefrLevel(),
-                        o.getSkill(),
-                        masteryService.roundMastery(mastery.getOrDefault(o.getId(), MasteryConfig.DEFAULT_MASTERY))))
+        List<ObjectiveDomain> domains = objectives.stream().map(o -> {
+            LearnerSkillState state = states.get(o.getId());
+            double masteryValue = state == null
+                    ? MasteryConfig.DEFAULT_MASTERY
+                    : state.getMastery().doubleValue();
+            Set<Long> prerequisites = o.getPrerequisiteLinks().stream()
+                    .map(link -> link.getPrerequisite().getId())
+                    .collect(Collectors.toSet());
+            return new ObjectiveDomain(
+                    o.getId(), o.getCode(), o.getName(), o.getCefrLevel(), o.getSkill(), masteryValue, prerequisites);
+        }).toList();
+
+        Map<Long, Double> masteryMap = domains.stream()
+                .collect(Collectors.toMap(ObjectiveDomain::id, ObjectiveDomain::mastery));
+        Optional<Long> recommended = masteryService.recommend(domains, masteryMap);
+
+        return domains.stream()
+                .map(d -> {
+                    LearnerSkillState skillState = states.get(d.id());
+                    boolean allPrereqsMastered = d.prerequisites().stream()
+                            .allMatch(p -> masteryMap.getOrDefault(p, MasteryConfig.DEFAULT_MASTERY)
+                                    >= MasteryConfig.MASTERED_THRESHOLD);
+                    ObjectiveState objState = masteryService.computeState(d.mastery(), allPrereqsMastered);
+                    if (recommended.isPresent() && recommended.get().equals(d.id())) {
+                        objState = ObjectiveState.RECOMMENDED;
+                    }
+                    return new ProgressResponse(
+                            d.id(),
+                            d.code(),
+                            d.name(),
+                            d.cefrLevel(),
+                            d.skill(),
+                            masteryService.roundMastery(d.mastery()),
+                            skillState == null ? 0 : skillState.getAttemptsCount(),
+                            skillState == null ? 0 : skillState.getCorrectCount(),
+                            objState);
+                })
                 .toList();
+    }
+
+    private AssignmentStatus parseStatus(String status) {
+        try {
+            return AssignmentStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Estado de asignación inválido: " + status);
+        }
     }
 
     private AssignmentResponse toResponse(Assignment assignment) {
@@ -127,10 +181,22 @@ public class AssignmentService {
 
     private StudentAssignmentResponse toStudentResponse(Assignment assignment) {
         Activity activity = assignment.getActivity();
+        ActivityStudentDto content = activityContentService.toStudentDto(activity.getType(), activity.getContent());
+        ActivityStudentDetailDto activityDetail = new ActivityStudentDetailDto(
+                activity.getId(),
+                activity.getType(),
+                activity.getLevel(),
+                activity.getSkill(),
+                activity.getTitle(),
+                content.prompt(),
+                content.options());
         return new StudentAssignmentResponse(
                 assignment.getId(),
                 activity.getId(),
                 assignment.getStatus().name(),
-                activityContentService.toStudentDto(activity.getType(), activity.getContent()));
+                assignment.getAssignedAt(),
+                assignment.getCompletedAt(),
+                assignment.getTeacher() == null ? null : assignment.getTeacher().getName(),
+                activityDetail);
     }
 }

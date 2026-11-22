@@ -3,6 +3,7 @@ package com.englishlab.controller;
 import com.englishlab.dto.ActivityDtos.ActivityStudentDetailDto;
 import com.englishlab.dto.ActivityDtos.ActivityStudentSummaryDto;
 import com.englishlab.dto.AssignmentDtos.StudentAssignmentResponse;
+import com.englishlab.dto.AttemptDtos.AttemptDetailResponse;
 import com.englishlab.dto.AttemptDtos.AttemptRequest;
 import com.englishlab.dto.AttemptDtos.AttemptResponse;
 import com.englishlab.dto.ObjectiveDtos.ObjectiveStateResponse;
@@ -112,6 +113,13 @@ public class StudentController {
         return ResponseEntity.ok(attemptService.submit(principal.id(), request));
     }
 
+    @GetMapping("/me/attempts/{id}")
+    public ResponseEntity<AttemptDetailResponse> myAttempt(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(attemptService.getMyAttempt(principal.id(), id));
+    }
+
     @GetMapping("/me/assignments")
     public ResponseEntity<PageResponse<StudentAssignmentResponse>> myAssignments(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -119,6 +127,13 @@ public class StudentController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
         return ResponseEntity.ok(assignmentService.myAssignments(principal.id(),
-                PageableFactory.of(page, size, sort, ASSIGNMENT_SORT, "id")));
+                PageableFactory.of(page, size, sort, ASSIGNMENT_SORT, "assignedAt")));
+    }
+
+    @GetMapping("/me/assignments/{assignmentId}/result")
+    public ResponseEntity<AttemptDetailResponse> assignmentResult(
+            @PathVariable Long assignmentId,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(attemptService.getAssignmentResult(principal.id(), assignmentId));
     }
 }

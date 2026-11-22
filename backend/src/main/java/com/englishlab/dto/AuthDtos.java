@@ -15,10 +15,12 @@ public final class AuthDtos {
 
     public record RegisterRequest(
             @NotBlank(message = "El nombre es obligatorio")
+            @Size(max = 120, message = "El nombre no puede superar los 120 caracteres")
             String name,
 
             @NotBlank(message = "El email es obligatorio")
             @Email(message = "El email no es válido")
+            @Size(max = 255, message = "El email no puede superar los 255 caracteres")
             String email,
 
             @NotBlank(message = "La contraseña es obligatoria")
