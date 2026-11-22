@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Badge, MockNotice, PageHeader } from '../../components/ui.jsx';
+import { Badge, PageHeader } from '../../components/ui.jsx';
 import MasteryChart from '../../components/MasteryChart.jsx';
 import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
 import { listAssignments, listObjectives } from '../../api/learning.js';
-import { mockAssignments } from '../../mock/mockServer.js';
 
 const COMPLETED = ['COMPLETED', 'DONE', 'Completada'];
 
@@ -14,8 +13,7 @@ export default function StudentHome() {
 
   const objectives = useRemote({ fetcher: () => listObjectives() });
   const assignments = useRemote({
-    fetcher: () => listAssignments(),
-    fallback: () => mockAssignments(),
+    fetcher: () => listAssignments()
   });
 
   const taskRows = Array.isArray(assignments.data) ? assignments.data : assignments.data?.content || [];
@@ -31,8 +29,6 @@ export default function StudentHome() {
       )
     : null;
 
-  const usingMock = assignments.status === REMOTE_STATUS.fallback;
-
   return (
     <>
       <PageHeader
@@ -40,7 +36,6 @@ export default function StudentHome() {
         title="Tu espacio para aprender"
         subtitle="Practica un poco cada día. Tus ejercicios, tareas y resultados están aquí."
       />
-      {usingMock ? <MockNotice what="el panel del estudiante" /> : null}
 
       <div className="mastery-inline">
         <span>Dominio medio:</span>

@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { MockNotice, PageHeader } from '../../components/ui.jsx';
+import { PageHeader } from '../../components/ui.jsx';
 import AttemptFeedback from '../../components/AttemptFeedback.jsx';
 
 /** Muestra lo que devuelve POST /attempts ({correct, score, solution,
@@ -21,7 +21,6 @@ export default function StudentResult() {
         title="Resultado de tu actividad"
         subtitle="La retroalimentación te ayuda a entender cómo mejorar."
       />
-      {!isReal ? <MockNotice what={`el intento ${intentoId} (calificación en servidor)`} /> : null}
       <AttemptFeedback
         result={result}
         answer={state.answer}

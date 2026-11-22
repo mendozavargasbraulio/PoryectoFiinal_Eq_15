@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, ErrorState, MockNotice, PageHeader, Spinner } from '../../components/ui.jsx';
+import { Badge, ErrorState, PageHeader, Spinner } from '../../components/ui.jsx';
 import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
 import { listAssignments, listObjectives } from '../../api/learning.js';
-import { mockAssignments, mockObjectives } from '../../mock/mockServer.js';
 import { skillLabel } from '../../lib/constants.js';
 
 const COMPLETED = ['COMPLETED', 'DONE', 'Completada'];
@@ -21,7 +20,6 @@ export default function StudentTasks() {
 
   const { status, data, error, reload } = useRemote({
     fetcher: () => (tab === 'tasks' ? listAssignments() : listObjectives()),
-    fallback: () => (tab === 'tasks' ? mockAssignments() : mockObjectives()),
     deps: [tab],
   });
 
