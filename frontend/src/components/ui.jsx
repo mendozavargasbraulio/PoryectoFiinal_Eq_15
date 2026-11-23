@@ -29,18 +29,6 @@ export function PageHeader({ eyebrow, title, subtitle }) {
   );
 }
 
-/** Aviso de que los datos son de muestra porque el endpoint aún no existe. */
-export function MockNotice({ what }) {
-  return (
-    <div className="mock-note">
-      <span>
-        Datos de muestra — {what ? <b>{what}</b> : 'esta vista'} usa contenido de demostración;
-        el endpoint del backend todavía no existe.
-      </span>
-    </div>
-  );
-}
-
 /** Error de red/servidor con botón opcional de reintento. */
 export function ErrorState({ message, onRetry }) {
   return (
