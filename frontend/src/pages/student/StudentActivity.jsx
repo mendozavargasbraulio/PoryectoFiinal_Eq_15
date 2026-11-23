@@ -8,7 +8,7 @@ import { submitAttempt, getMyActivity } from '../../api/learning.js';
 import { activityTypeLabel } from '../../lib/constants.js';
 
 /** Normaliza las opciones a [{id,text}]. La API student devuelve `[{id,text}]`
- *  (o null en FILL_BLANK); se aceptan strings por compatibilidad con el mock. */
+ *  (o null en FILL_BLANK). */
 function normalizeOptions(options) {
   if (!Array.isArray(options)) return [];
   return options.map((o, i) =>
@@ -189,13 +189,13 @@ export default function StudentActivity() {
         setAttempt({ result: data || {}, answer: rawAnswer });
         setResults((prev) => [...prev, { result: data || {}, answer: rawAnswer }]);
       } else {
-        navigate(`/estudiante/resultado/${data?.attemptId || data?.id || activityId}`, {
+        navigate(`/estudiante/resultado/${data?.attemptId || activityId}`, {
           state: {
             result: data,
             real: true,
             answer: rawAnswer,
             mode: challengeMode ? 'CHALLENGE' : 'NORMAL',
-            activity: { type, options },
+            activity: { title: activity?.title, type, options },
           },
         });
       }
@@ -209,17 +209,15 @@ export default function StudentActivity() {
 
   function check() {
     const a = answer();
-    // En RETO el servidor califica también la respuesta vacía ("sin responder"),
-    // así que no se bloquea el envío manual.
-    if (!challengeMode) {
-      if (type === 'MULTIPLE_CHOICE' && (a === '' || a == null)) {
-        setFeedback('Elige una respuesta.');
-        return;
-      }
-      if (type === 'FILL_BLANK' && !a) {
-        setFeedback('Escribe una respuesta.');
-        return;
-      }
+    // El envío vacío ("sin responder") solo ocurre por timeout automático en RETO;
+    // al pulsar manualmente "Comprobar respuesta" siempre pedimos una respuesta.
+    if (type === 'MULTIPLE_CHOICE' && (a === '' || a == null)) {
+      setFeedback('Elige una respuesta.');
+      return;
+    }
+    if (type === 'FILL_BLANK' && !a) {
+      setFeedback('Escribe una respuesta.');
+      return;
     }
     send(a);
   }
@@ -239,13 +237,21 @@ export default function StudentActivity() {
   /** Flecha de salida de la actividad: primero confirma, luego vuelve atrás.
    *  En el resumen final (sesión terminada) no hay progreso que perder: la
    *  flecha navega directo. */
+  function goBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/estudiante/tareas');
+    }
+  }
+
   function requestExit() {
     setExitOpen(true);
   }
 
   function confirmExit() {
     setExitOpen(false);
-    navigate(-1);
+    goBack();
   }
 
   /** Resumen final: solo Calificación y Dominio del tema, en porcentaje. */
@@ -269,7 +275,7 @@ export default function StudentActivity() {
             type="button"
             aria-label="Salir de la actividad"
             title="Salir de la actividad"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
           >
             ←
           </button>
@@ -396,7 +402,8 @@ export default function StudentActivity() {
               tabIndex={0}
               onClick={() => { setSelected(opt.id); setFeedback(''); }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
                   setSelected(opt.id);
                   setFeedback('');
                 }
@@ -415,6 +422,12 @@ export default function StudentActivity() {
             placeholder="Escribe la palabra o frase que falta"
             value={typed}
             onChange={(e) => { setTyped(e.target.value); setFeedback(''); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !busy) {
+                e.preventDefault();
+                check();
+              }
+            }}
           />
         </div>
       )}
@@ -501,7 +514,7 @@ export default function StudentActivity() {
           options={options}
         >
           <button className="btn olive" type="button" onClick={advance}>
-            Siguiente pregunta
+            {index + 1 >= total ? 'Ver resumen' : 'Siguiente pregunta'}
           </button>
         </AttemptFeedback>
       ) : (

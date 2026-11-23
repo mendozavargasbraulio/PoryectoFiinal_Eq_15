@@ -1,6 +1,6 @@
 /**
  * Constantes de dominio compartidas por las pantallas conectadas a la API.
- * Valores alineados con el backend/seed (confirmado por el coordinator).
+ * Valores alineados con el backend y las migraciones de la base de datos.
  */
 
 /** Niveles CEFR (en MAYÚSCULAS, como los usa el backend). */
