@@ -1,9 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
-/**
- * Toast global (equivalente al toast() del prototipo Figma, HTML:98).
- * Nada de diálogos nativos: los avisos no bloqueantes pasan por aquí.
- */
+/** Toast global: avisos no bloqueantes, sin diálogos nativos. */
 const ToastContext = createContext({ showToast: () => {} });
 
 let toastId = 0;
@@ -19,9 +16,9 @@ export function ToastProvider({ children }) {
   }, []);
 
   const showToast = useCallback(
-    (message, kind = 'info') => {
+    (message) => {
       const id = ++toastId;
-      setToasts((list) => [...list, { id, message, kind }]);
+      setToasts((list) => [...list, { id, message }]);
       timers.current[id] = setTimeout(() => dismiss(id), 3800);
     },
     [dismiss]

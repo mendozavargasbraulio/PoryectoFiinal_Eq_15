@@ -1,21 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, ErrorState, MockNotice, PageHeader, Spinner } from '../../components/ui.jsx';
+import { Badge, ErrorState, PageHeader, Spinner } from '../../components/ui.jsx';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
 import { useToast } from '../../components/Toast.jsx';
-import { useRemote, mutateWithFallback, REMOTE_STATUS } from '../../api/useRemote.js';
+import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
 import { listActivities, removeActivity } from '../../api/activities.js';
 import { listCategories } from '../../api/categories.js';
-import { mockActivitiesPage, mockRemoveActivity, mockCategoriesPage } from '../../mock/mockServer.js';
+import { extractApiError } from '../../api/client.js';
 import { roleLabel } from '../../lib/format.js';
 import { LEVELS, SKILLS, ACTIVITY_TYPE_CODES, activityTypeLabel, skillLabel } from '../../lib/constants.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 
 const PAGE_SIZE = 5;
 
-/** Compartida profesor + admin. Patrón mock/real: GET /content/activities con
- *  filtros level/skill/type/categoryId/text y paginación server-side; 404 usa el
- *  mock con el mismo shape; 401/403/5xx muestran <ErrorState/> real. */
+/** Compartida profesor + admin: GET /content/activities con filtros
+ *  level/skill/type/categoryId/text y paginación server-side. */
 export default function ActivityBank() {
   const { role } = useAuth();
   const navigate = useNavigate();
@@ -39,32 +38,19 @@ export default function ActivityBank() {
         categoryId: applied.categoryId || undefined,
         text: applied.text || undefined,
       }),
-    fallback: () =>
-      mockActivitiesPage({
-        page,
-        size: PAGE_SIZE,
-        sort: 'title,asc',
-        level: applied.level || undefined,
-        skill: applied.skill || undefined,
-        type: applied.type || undefined,
-        categoryId: applied.categoryId || undefined,
-        text: applied.text,
-      }),
     deps: [page, applied],
   });
 
-  // Opciones del filtro de categoría: se piden a la API (admin) con fallback
-  // mock; si fallan, el select queda solo con "Todas las categorías".
+  // Opciones del filtro de categoría (lectura permitida para ADMIN y TEACHER).
   const categoriesRemote = useRemote({
     fetcher: () => listCategories({ page: 0, size: 100, sort: 'name,asc' }),
-    fallback: () => mockCategoriesPage({ page: 0, size: 100, sort: 'name,asc' }),
   });
-  const categories = categoriesRemote.status === REMOTE_STATUS.real || categoriesRemote.status === REMOTE_STATUS.fallback
+  const categories = categoriesRemote.status === REMOTE_STATUS.real
     ? categoriesRemote.data?.content || []
     : [];
 
   const content = data?.content || [];
-  const totalPages = data?.totalPages || 1;
+  const totalPages = Math.max(1, data?.totalPages || 1);
   const currentPage = data?.page ?? page;
 
   function setFilter(name, value) {
@@ -86,19 +72,16 @@ export default function ActivityBank() {
   async function confirmDelete() {
     setBusy(true);
     try {
-      const { mode } = await mutateWithFallback(
-        () => removeActivity(toDelete.id),
-        () => mockRemoveActivity(toDelete.id)
-      );
-      showToast(
-        mode === 'real'
-          ? 'Actividad eliminada.'
-          : 'Demo (mock): eliminación local; el endpoint /content/activities todavía no existe.'
-      );
+      await removeActivity(toDelete.id);
+      showToast('Actividad eliminada.');
       setToDelete(null);
-      reload();
+      if (content.length === 1 && currentPage > 0) {
+        setPage((p) => Math.max(0, p - 1));
+      } else {
+        reload();
+      }
     } catch (err) {
-      showToast(err?.response?.data?.detail || 'No se pudo eliminar la actividad.');
+      showToast(extractApiError(err).detail || 'No se pudo eliminar la actividad.');
     } finally {
       setBusy(false);
     }
@@ -110,7 +93,6 @@ export default function ActivityBank() {
         eyebrow={role === 'ADMIN' ? 'PORTAL / ADMINISTRADOR' : 'PORTAL / PROFESOR'}
         title="Banco de actividades"
       />
-      {status === REMOTE_STATUS.fallback ? <MockNotice what="el banco de actividades" /> : null}
 
       {status === REMOTE_STATUS.error ? (
         <ErrorState message={error?.detail} onRetry={reload} />
@@ -159,7 +141,7 @@ export default function ActivityBank() {
             <button className="btn alt small" type="submit">
               Filtrar
             </button>
-            <button className="btn olive small" type="button" onClick={() => navigate('/actividades/nueva')}>
+            <button className="btn coffee-outline small" type="button" onClick={() => navigate('/actividades/nueva')}>
               Crear actividad
             </button>
           </form>

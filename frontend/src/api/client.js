@@ -1,18 +1,18 @@
 import axios from 'axios';
 
 /**
- * Cliente HTTP central de English Lab.
- * - baseURL: VITE_API_URL si está definido; si no, el proxy de Vite (/api/v1).
- * - Interceptor de petición: agrega Authorization: Bearer <token>.
- * - Interceptor de respuesta: en 401 (y salvo en llamadas de auth) limpia la
- *   sesión y redirige a /login.
+ * Cliente HTTP central: baseURL por VITE_API_URL (o el proxy de Vite).
+ * El interceptor añade el JWT; un 401 fuera de /auth/* limpia la sesión y
+ * redirige a /login.
  */
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
-export const SESSION_EXPIRED_KEY = 'englishlab.sessionExpired';
-
 export const TOKEN_KEY = 'englishlab.auth';
+
+/** La pone el interceptor 401 para que Login avise de la sesión expirada una
+ *  sola vez (Login la consume y la borra). */
+export const SESSION_EXPIRED_KEY = 'englishlab.sessionExpired';
 
 export function readStoredAuth() {
   try {
@@ -58,6 +58,11 @@ client.interceptors.response.use(
     if (status === 401 && !isAuthCall) {
       clearStoredAuth();
       if (!window.location.pathname.startsWith('/login')) {
+        try {
+          window.sessionStorage.setItem(SESSION_EXPIRED_KEY, '1');
+        } catch {
+          /* sessionStorage no disponible (modo privado): seguimos sin aviso */
+        }
         window.location.assign('/login');
       }
     }
@@ -65,10 +70,7 @@ client.interceptors.response.use(
   }
 );
 
-/**
- * Normaliza el ProblemDetail del backend a algo usable por la UI:
- * { title, detail, status, fieldErrors: [{field, message}] }
- */
+/** Normaliza el ProblemDetail del backend a {title, detail, status, fieldErrors}. */
 export function extractApiError(error) {
   const data = error?.response?.data;
   if (!error.response) {

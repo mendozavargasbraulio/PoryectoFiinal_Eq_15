@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { clearStoredAuth, readStoredAuth, writeStoredAuth } from '../api/client.js';
+import { readStoredAuth, writeStoredAuth } from '../api/client.js';
 
 /**
  * Estado de sesión: {token, user}. user.role lo determina el backend

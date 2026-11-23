@@ -22,12 +22,10 @@ export const NAV_MENUS = {
     { to: '/resultados', label: 'Resultados' },
   ],
   ADMIN: [
-    { to: '/actividades', label: 'Banco de actividades', end: true },
-    { to: '/actividades/nueva', label: 'Crear actividad', match: '/actividades/nueva' },
-    { to: '/asignaciones/nueva', label: 'Asignar tarea' },
-    { to: '/resultados', label: 'Resultados' },
     { to: '/admin/usuarios', label: 'Administrar usuarios' },
     { to: '/admin/categorias', label: 'Categorías' },
+    { to: '/actividades', label: 'Banco de actividades', end: true },
+    { to: '/actividades/nueva', label: 'Crear actividad', match: '/actividades/nueva' },
   ],
 };
 

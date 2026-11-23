@@ -23,6 +23,7 @@ export default function InternalLayout({ crumb, children }) {
     } catch {
       // aunque el logout de servidor falle, la sesión local se cierra
     } finally {
+      setLoggingOut(false);
       logout();
       navigate('/login', { replace: true });
     }

@@ -1,5 +1,5 @@
-/** Layout de las 4 pantallas públicas (authLayout() del Figma, HTML:56).
- *  Sin menú ni topbar. El arte lateral se oculta en <=970px (media query del Figma). */
+/** Layout de las pantallas públicas: sin menú ni topbar. El arte lateral se
+ *  oculta en <=970px (media query). */
 export default function AuthLayout({ children }) {
   return (
     <main className="auth-page">

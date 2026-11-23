@@ -23,22 +23,26 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
 
   const rules = {
-    name: (v) => required(v, 'El nombre'),
-    email: (v) => required(v, 'El correo') || validateEmail(v),
+    name: (v) => required(v, 'El nombre') || (String(v || '').trim().length > 120 ? 'Máximo 120 caracteres.' : ''),
+    email: (v) =>
+      required(v, 'El correo')
+      || validateEmail(v)
+      || (String(v || '').trim().length > 255 ? 'Máximo 255 caracteres.' : ''),
     password: (v) => validatePassword(v),
-    confirmPassword: (v) => validatePassword(v) || matchesPassword(v, values.password),
+    confirmPassword: (v) => required(v, 'Confirmar contraseña') || matchesPassword(v, values.password),
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     const next = { ...values, [name]: value };
     setValues(next);
+    setSubmitError('');
     // Revalidación en vivo: si ya tocó confirmar y cambia la clave, revisa coincidencia.
     setErrors((errs) => ({
       ...errs,
       ...(touched[name] ? { [name]: rules[name](value) } : {}),
       ...(touched.confirmPassword && name === 'password'
-        ? { confirmPassword: matchesPassword(next.confirmPassword, value) }
+        ? { confirmPassword: required(next.confirmPassword, 'Confirmar contraseña') || matchesPassword(next.confirmPassword, value) }
         : {}),
     }));
   };

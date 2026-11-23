@@ -7,6 +7,23 @@ import client, { extractApiError, SESSION_EXPIRED_KEY } from '../api/client.js';
 import { useAuth, homePathForRole } from '../auth/AuthContext.jsx';
 import { email as validateEmail, required } from '../lib/validators.js';
 
+function isAllowedForRole(path, role) {
+  if (!path || path === '/' || path === '/login' || path === '/registro' || path === '/recuperar' || path === '/restablecer') {
+    return false;
+  }
+  if (role === 'STUDENT') return path.startsWith('/estudiante/');
+  if (role === 'TEACHER') {
+    return (
+      path.startsWith('/profesor/')
+      || path.startsWith('/actividades')
+      || path.startsWith('/asignaciones')
+      || path.startsWith('/resultados')
+    );
+  }
+  if (role === 'ADMIN') return path.startsWith('/admin/') || path.startsWith('/actividades');
+  return false;
+}
+
 /** Sin selector de rol: el rol lo devuelve el backend y decide el panel al que
  *  se redirige. */
 export default function Login() {
@@ -41,6 +58,7 @@ export default function Login() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setValues((v) => ({ ...v, [name]: value }));
+    setSubmitError('');
     if (touched[name]) setErrors((errs) => ({ ...errs, [name]: rules[name](value) }));
   };
 
@@ -67,7 +85,9 @@ export default function Login() {
       });
       login(data.token, data.user);
       const from = location.state?.from;
-      navigate(from || homePathForRole(data.user?.role), { replace: true });
+      const role = data.user?.role;
+      const target = isAllowedForRole(from, role) ? from : homePathForRole(role);
+      navigate(target, { replace: true });
     } catch (err) {
       const apiError = extractApiError(err);
       const fieldErrors = {};
