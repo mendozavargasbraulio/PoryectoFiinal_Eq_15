@@ -2,14 +2,17 @@ import client from './client.js';
 
 /**
  * Servicio del estudiante: /me/assignments, /me/activities/{id}, /attempts,
- * /me/objectives y /me/objectives/{id}/practice-session.
- * POST /attempts devuelve {correct, score, solution, explanation, mastery}; en
- * MULTIPLE_CHOICE `solution` es el ID de la opción correcta. `mode` es "NORMAL"
+ * /me/attempts/{id}, /me/assignments/{id}/result, /me/objectives y
+ * /me/objectives/{id}/practice-session.
+ * POST /attempts devuelve {attemptId, correct, score, solution, explanation, mastery};
+ * en MULTIPLE_CHOICE `solution` es el ID de la opción correcta. `mode` es "NORMAL"
  * (por defecto) o "CHALLENGE" (acierto +1.0, fallo −0.5, sin responder 0.0).
  */
 
-export function listAssignments() {
-  return client.get('/me/assignments');
+export function listAssignments({ page = 0, size = 10, sort = 'assignedAt,desc' } = {}) {
+  return client.get('/me/assignments', {
+    params: { page, size, sort },
+  });
 }
 
 export function getMyActivity(id) {
@@ -27,6 +30,14 @@ export function submitAttempt({ activityId, answer, assignmentId, mode }) {
   });
 }
 
+export function getMyAttempt(id) {
+  return client.get(`/me/attempts/${id}`);
+}
+
+export function getAssignmentResult(assignmentId) {
+  return client.get(`/me/assignments/${assignmentId}/result`);
+}
+
 export function listObjectives() {
   return client.get('/me/objectives');
 }
@@ -36,4 +47,3 @@ export function listObjectives() {
 export function getPracticeSession(objectiveId, { size = 10 } = {}) {
   return client.get(`/me/objectives/${objectiveId}/practice-session`, { params: { size } });
 }
-

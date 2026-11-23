@@ -27,20 +27,26 @@ const STATE_LABELS = {
   RECOMMENDED: 'Recomendado',
   MASTERED: 'Dominado',
   BLOCKED: 'Bloqueado',
-  LOCKED: 'Bloqueado',
-  IN_PROGRESS: 'En progreso',
 };
 
 function stateLabel(code) {
-  return STATE_LABELS[code] || code || '—';
+  return STATE_LABELS[String(code || '').toUpperCase()] || code || '—';
 }
 
-/** GET /me/objectives alimenta el dominio por objetivo. "Practicar" pide la
- *  sesión al servidor (GET /me/objectives/{id}/practice-session?size=10 →
- *  {activityIds}) y navega DIRECTO al reproductor con la cola en
- *  state.activityIds. "Reto" abre una mini-selección de dificultad (30/20/10 s
- *  por pregunta) y añade state.challengeSeconds. El servidor califica cada
- *  intento. */
+function stateBadgeColor(code) {
+  switch (String(code || '').toUpperCase()) {
+    case 'MASTERED':
+      return 'green';
+    case 'RECOMMENDED':
+      return 'gold';
+    default:
+      return 'gray';
+  }
+}
+
+/** GET /me/objectives alimenta el dominio por objetivo. "Practicar" pide la sesión
+ *  al servidor (GET /me/objectives/{id}/practice-session?size=10 → {activityIds})
+ *  y navega DIRECTO al reproductor con la cola en state.activityIds. */
 export default function StudentProgress() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -63,13 +69,6 @@ export default function StudentProgress() {
       mastery: o.mastery,
       state: o.state,
     }));
-
-  const stats = rows.length
-    ? {
-        total: rows.length,
-        avg: Math.round(rows.reduce((s, o) => s + Number(o.mastery || 0), 0) / rows.length * 100),
-      }
-    : { total: 0, avg: 0 };
 
   /** `challengeSeconds` null/undefined = práctica normal; 30/20/10 = RETO. */
   async function startPractice(objectiveId, challengeSeconds = null) {
@@ -94,7 +93,6 @@ export default function StudentProgress() {
     } catch (err) {
       const apiError = extractApiError(err);
       if (apiError.status === 422) {
-        // Objetivo BLOCKED por prerrequisitos: el detalle explica el motivo.
         showToast(apiError.detail);
       } else {
         setSessionError({ objectiveId, challengeSeconds, detail: apiError.detail });
@@ -117,23 +115,8 @@ export default function StudentProgress() {
         subtitle="Consulta tu dominio por objetivo y lanza una sesión de práctica cuando quieras."
       />
 
-      <div className="grid g3">
-        <div className="card">
-          <span className="stat-label">Objetivos</span>
-          <div className="stat-number">{stats.total}</div>
-        </div>
-        <div className="card">
-          <span className="stat-label">Dominio medio</span>
-          <div className="stat-number">{stats.avg}%</div>
-        </div>
-        <div className="card">
-          <span className="stat-label">Recomendado</span>
-          <div className="stat-number">{rows.filter((o) => Number(o.mastery || 0) < 0.65).length}</div>
-        </div>
-      </div>
-
       {sessionError ? (
-        <div className="card mt">
+        <div className="card">
           <ErrorState
             message={sessionError.detail || 'No se pudo preparar la sesión de práctica.'}
             onRetry={() => startPractice(sessionError.objectiveId, sessionError.challengeSeconds)}
@@ -141,7 +124,7 @@ export default function StudentProgress() {
         </div>
       ) : null}
 
-      <div className="card mt">
+      <div className={`card${sessionError ? ' mt' : ''}`}>
         <h3 className="card-title">Dominio por objetivo</h3>
         {objectives.status === REMOTE_STATUS.loading ? (
           <Spinner small />
@@ -170,9 +153,12 @@ export default function StudentProgress() {
                 </div>
                 <div
                   className="smallprint"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 6 }}
                 >
-                  <span>{skillLabel(o.skill)} · {o.cefrLevel || '—'}</span>
+                  <span className="btn-row">
+                    <span>{skillLabel(o.skill)} · {o.cefrLevel || '—'}</span>
+                    <Badge color={stateBadgeColor(o.state)}>{stateLabel(o.state)}</Badge>
+                  </span>
                   {canPractice ? (
                     <div className="btn-row">
                       <button
@@ -193,9 +179,7 @@ export default function StudentProgress() {
                         {startingChallenge ? 'Preparando…' : 'Reto'}
                       </button>
                     </div>
-                  ) : (
-                    <Badge color="gray">{stateLabel(o.state)}</Badge>
-                  )}
+                  ) : null}
                 </div>
                 {canPractice && challengeOpen ? (
                   <div className="btn-row" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
