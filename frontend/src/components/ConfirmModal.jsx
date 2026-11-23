@@ -1,7 +1,4 @@
-/**
- * Modal de confirmación (sustituto obligatorio del confirm nativo).
- * Misma estética que .overlay/.modal del Figma (HTML:97): role="dialog", aria-modal.
- */
+/** Sustituye al confirm nativo: .overlay/.modal con role="dialog". */
 export default function ConfirmModal({
   open,
   title,

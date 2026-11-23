@@ -7,6 +7,7 @@ import {
   matchesPassword,
   password as validatePassword,
   PASSWORD_RULE,
+  required,
 } from '../lib/validators.js';
 
 /** Nueva contraseña: recibe el token del enlace por ?token=; si falta, avisa
@@ -24,13 +25,21 @@ export default function ResetPassword() {
 
   const rules = {
     password: (v) => validatePassword(v),
-    confirmPassword: (v) => validatePassword(v) || matchesPassword(v, values.password),
+    confirmPassword: (v) => required(v, 'Confirmar contraseña') || matchesPassword(v, values.password),
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setValues((v) => ({ ...v, [name]: value }));
-    if (touched[name]) setErrors((errs) => ({ ...errs, [name]: rules[name](value) }));
+    const next = { ...values, [name]: value };
+    setValues(next);
+    setSubmitError('');
+    setErrors((errs) => ({
+      ...errs,
+      ...(touched[name] ? { [name]: rules[name](value) } : {}),
+      ...(touched.confirmPassword && name === 'password'
+        ? { confirmPassword: required(next.confirmPassword, 'Confirmar contraseña') || matchesPassword(next.confirmPassword, value) }
+        : {}),
+    }));
   };
 
   const handleBlur = (e) => {
@@ -56,7 +65,8 @@ export default function ResetPassword() {
       const apiError = extractApiError(err);
       const fieldErrors = {};
       apiError.fieldErrors.forEach((f) => {
-        if (f.field in values) fieldErrors[f.field] = f.message;
+        const key = f.field === 'newPassword' ? 'password' : f.field;
+        if (key in values) fieldErrors[key] = f.message;
       });
       setErrors((prev) => ({ ...prev, ...fieldErrors }));
       if (!Object.keys(fieldErrors).length) {

@@ -26,13 +26,3 @@ export function password(value) {
 export function matchesPassword(value, other) {
   return value === other ? '' : 'Las contraseñas no coinciden.';
 }
-
-/** Comprueba un formulario completo; devuelve {values, errors, isValid}. */
-export function validateAll(values, rules) {
-  const errors = {};
-  for (const [key, rule] of Object.entries(rules)) {
-    errors[key] = rule(values[key]) || '';
-  }
-  const isValid = Object.values(errors).every((e) => !e);
-  return { errors, isValid };
-}

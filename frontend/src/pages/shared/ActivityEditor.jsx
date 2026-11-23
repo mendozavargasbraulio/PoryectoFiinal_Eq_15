@@ -1,25 +1,61 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ErrorState, MockNotice, PageHeader, Spinner } from '../../components/ui.jsx';
+import { Badge, ErrorState, PageHeader, Spinner } from '../../components/ui.jsx';
 import Input from '../../components/Input.jsx';
 import { useToast } from '../../components/Toast.jsx';
-import { mutateWithFallback, useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
-import { listActivities, listContentObjectives, createActivity, updateActivity } from '../../api/activities.js';
+import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
+import { getActivity, listContentObjectives, createActivity, updateActivity } from '../../api/activities.js';
 import { listCategories } from '../../api/categories.js';
-import {
-  mockCreateActivity,
-  mockUpdateActivity,
-  mockCategoriesPage,
-  mockContentObjectivesPage,
-} from '../../mock/mockServer.js';
+import { extractApiError } from '../../api/client.js';
 import { required } from '../../lib/validators.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { LEVELS, SKILLS, ACTIVITY_TYPE_CODES, activityTypeLabel } from '../../lib/constants.js';
 
-const splitOptions = (s) => String(s || '').split('|').map((x) => x.trim()).filter(Boolean);
+const MIN_MC_OPTIONS = 3;
+
+function optionIdForIndex(idx) {
+  return idx < 26 ? String.fromCharCode(97 + idx) : `o${idx + 1}`;
+}
+
+function optionLetter(idx) {
+  return idx < 26 ? String.fromCharCode(65 + idx) : String(idx + 1);
+}
+
+function extractOptionText(opt) {
+  if (opt && typeof opt === 'object') return String(opt.text ?? '').trim();
+  return String(opt ?? '').trim();
+}
 
 function activityToValues(a) {
   const content = a?.content || {};
+  const rawOptions = Array.isArray(content.options) ? content.options : [];
+
+  let options = ['', '', ''];
+  let correctIndex = -1;
+
+  if (a?.type === 'MULTIPLE_CHOICE' && rawOptions.length) {
+    options = rawOptions.map(extractOptionText);
+    while (options.length < MIN_MC_OPTIONS) options.push('');
+    const answerKey = content.answer != null ? String(content.answer) : '';
+    const idxById = rawOptions.findIndex(
+      (o) => o && typeof o === 'object' && String(o.id) === answerKey
+    );
+    if (idxById >= 0) {
+      correctIndex = idxById;
+    } else if (answerKey) {
+      correctIndex = options.findIndex((t) => t === answerKey.trim());
+    }
+  }
+
+  let accepted = [''];
+  if (a?.type === 'FILL_BLANK') {
+    if (Array.isArray(content.accepted) && content.accepted.length) {
+      accepted = content.accepted.map((x) => String(x ?? ''));
+    } else if (typeof content.accepted === 'string' && content.accepted.trim()) {
+      accepted = [content.accepted.trim()];
+    }
+  }
+
   return {
     title: a?.title || '',
     level: a?.level || '',
@@ -28,18 +64,16 @@ function activityToValues(a) {
     objectiveId: a?.objectiveId != null ? String(a.objectiveId) : '',
     type: a?.type || '',
     statement: content.prompt || '',
-    options: Array.isArray(content.options) ? content.options.join(' | ') : content.options || '',
-    answer: a?.type === 'FILL_BLANK'
-      ? (Array.isArray(content.accepted) ? content.accepted.join(' | ') : content.accepted || '')
-      : content.answer || '',
+    options,
+    correctIndex,
+    accepted,
     explanation: content.explanation || '',
   };
 }
 
-/** Pantalla completa (no modal). Patrón mock/real: POST/PUT
- *  /content/activities; 404 guarda en mock y lo avisa. Validación bajo cada
- *  input y por tipo: MULTIPLE_CHOICE (prompt + options≥3 + answer),
- *  FILL_BLANK (prompt + accepted). */
+/** Pantalla completa (no modal) conectada a GET/POST/PUT /content/activities.
+ *  Constructor estilo Forms: en MULTIPLE_CHOICE se agregan opciones una a una y
+ *  se marca la correcta con radio; en FILL_BLANK se agregan respuestas aceptadas. */
 export default function ActivityEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -51,34 +85,46 @@ export default function ActivityEditor() {
   const [loading, setLoading] = useState(Boolean(id));
   const [loadError, setLoadError] = useState(null);
 
-  // En edición, la actividad llega por `state` desde el banco. Si se accede
-  // por URL directa, se busca de forma best-effort en el listado (no existe
-  // GET /content/activities/{id} en el contrato).
+  const [values, setValues] = useState(() => activityToValues(null));
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [busy, setBusy] = useState(false);
+
   useEffect(() => {
     if (!id) {
       setInitial(null);
+      setLoadError(null);
+      setValues(activityToValues(null));
+      setErrors({});
+      setTouched({});
+      setSubmitError('');
       setLoading(false);
       return;
     }
-    if (location.state?.activity) {
+    if (location.state?.activity && String(location.state.activity.id) === String(id)) {
       setInitial(location.state.activity);
+      setLoadError(null);
+      setErrors({});
+      setTouched({});
+      setSubmitError('');
       setLoading(false);
       return;
     }
     let alive = true;
     setLoading(true);
-    listActivities({ page: 0, size: 100 })
+    setLoadError(null);
+    getActivity(id)
       .then((res) => {
-        const found = (res.data?.content || []).find((a) => String(a.id) === String(id));
         if (alive) {
-          setInitial(found || null);
-          setLoadError(found ? null : { detail: 'No se encontró la actividad solicitada.' });
+          setInitial(res.data || null);
+          setLoadError(res.data ? null : { detail: 'No se encontró la actividad solicitada.' });
           setLoading(false);
         }
       })
       .catch((err) => {
         if (alive) {
-          setLoadError({ detail: err?.response?.data?.detail || 'No se pudo cargar la actividad.' });
+          setLoadError({ detail: extractApiError(err).detail || 'No se pudo cargar la actividad.' });
           setLoading(false);
         }
       });
@@ -87,32 +133,26 @@ export default function ActivityEditor() {
     };
   }, [id, location.state?.activity]);
 
-  const [values, setValues] = useState(activityToValues(initial));
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
-  const [submitError, setSubmitError] = useState('');
-  const [busy, setBusy] = useState(false);
-
   useEffect(() => {
-    if (initial !== null) setValues(activityToValues(initial));
+    if (initial !== null) {
+      setValues(activityToValues(initial));
+      setErrors({});
+      setTouched({});
+      setSubmitError('');
+    }
   }, [initial]);
 
-  // Opciones del select de categoría: API real con fallback mock (admin).
-  // Para TEACHER el endpoint es solo-admin (403) y el select queda vacío.
   const categoriesRemote = useRemote({
     fetcher: () => listCategories({ page: 0, size: 100, sort: 'name,asc' }),
-    fallback: () => mockCategoriesPage({ page: 0, size: 100, sort: 'name,asc' }),
   });
-  const categories = categoriesRemote.status === REMOTE_STATUS.real || categoriesRemote.status === REMOTE_STATUS.fallback
+  const categories = categoriesRemote.status === REMOTE_STATUS.real
     ? categoriesRemote.data?.content || []
     : [];
 
-  // Objetivos de contenido para el select de objetivo.
   const objectivesRemote = useRemote({
-    fetcher: () => listContentObjectives({ page: 0, size: 50 }),
-    fallback: () => mockContentObjectivesPage({ page: 0, size: 50 }),
+    fetcher: () => listContentObjectives({ page: 0, size: 100 }),
   });
-  const objectives = objectivesRemote.status === REMOTE_STATUS.real || objectivesRemote.status === REMOTE_STATUS.fallback
+  const objectives = objectivesRemote.status === REMOTE_STATUS.real
     ? objectivesRemote.data?.content || []
     : [];
 
@@ -124,14 +164,34 @@ export default function ActivityEditor() {
     e.objectiveId = required(v.objectiveId, 'El objetivo');
     e.type = required(v.type, 'El tipo de ejercicio');
     e.statement = required(v.statement, 'El enunciado');
-    const opts = splitOptions(v.options);
+
     if (v.type === 'MULTIPLE_CHOICE') {
-      e.options = opts.length >= 3 ? '' : 'Escribe al menos 3 opciones separadas por "|".';
-      e.answer = required(v.answer, 'La respuesta correcta')
-        || (!opts.includes(String(v.answer).trim()) ? 'La respuesta debe ser una de las opciones.' : '');
+      const trimmed = v.options.map((o) => String(o || '').trim());
+      const nonEmpty = trimmed.filter(Boolean);
+      if (nonEmpty.length < MIN_MC_OPTIONS) {
+        e.options = `Completa al menos ${MIN_MC_OPTIONS} opciones de respuesta.`;
+      } else if (trimmed.some((t) => !t)) {
+        e.options = 'Completa o elimina las opciones vacías.';
+      } else if (new Set(nonEmpty.map((t) => t.toLowerCase())).size !== nonEmpty.length) {
+        e.options = 'Las opciones no pueden repetirse.';
+      } else {
+        e.options = '';
+      }
+      if (v.correctIndex < 0 || v.correctIndex >= trimmed.length || !trimmed[v.correctIndex]) {
+        e.answer = 'Marca el círculo de la opción correcta.';
+      } else {
+        e.answer = '';
+      }
     } else if (v.type === 'FILL_BLANK') {
       e.options = '';
-      e.answer = required(v.answer, 'La respuesta aceptada');
+      const cleaned = v.accepted.map((a) => String(a || '').trim()).filter(Boolean);
+      if (!cleaned.length) {
+        e.answer = 'Escribe al menos una respuesta aceptada.';
+      } else if (new Set(cleaned.map((t) => t.toLowerCase())).size !== cleaned.length) {
+        e.answer = 'Las respuestas aceptadas no pueden repetirse.';
+      } else {
+        e.answer = '';
+      }
     } else {
       e.options = '';
       e.answer = '';
@@ -139,33 +199,123 @@ export default function ActivityEditor() {
     return e;
   }
 
+  function updateValues(next, fieldsToValidate = []) {
+    setValues(next);
+    setSubmitError('');
+    const nextErrors = validate(next);
+    setErrors((errs) => {
+      const updated = { ...errs };
+      fieldsToValidate.forEach((f) => {
+        if (touched[f]) updated[f] = nextErrors[f];
+      });
+      return updated;
+    });
+  }
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setValues((v) => ({ ...v, [name]: value }));
+    const next = { ...values, [name]: value };
+    setValues(next);
     setSubmitError('');
-    if (touched[name]) setErrors((errs) => ({ ...errs, [name]: validate({ ...values, [name]: value })[name] }));
+    const nextErrors = validate(next);
+    setErrors((errs) => {
+      const updated = { ...errs };
+      if (touched[name]) updated[name] = nextErrors[name];
+      if (name === 'type') {
+        updated.options = touched.options ? nextErrors.options : '';
+        updated.answer = touched.answer ? nextErrors.answer : '';
+      }
+      return updated;
+    });
   };
 
   const handleBlur = (e) => {
     const { name, value } = e.target;
+    const next = { ...values, [name]: value };
     setTouched((t) => ({ ...t, [name]: true }));
-    setErrors((errs) => ({ ...errs, [name]: validate({ ...values, [name]: value })[name] }));
+    const nextErrors = validate(next);
+    setErrors((errs) => ({ ...errs, [name]: nextErrors[name] }));
   };
 
-  function buildContent(type, v) {
+  function handleOptionChange(idx, text) {
+    const nextOptions = values.options.map((o, i) => (i === idx ? text : o));
+    updateValues({ ...values, options: nextOptions }, ['options', 'answer']);
+  }
+
+  function handleSelectCorrect(idx) {
+    const next = { ...values, correctIndex: idx };
+    setValues(next);
+    setSubmitError('');
+    setTouched((t) => ({ ...t, answer: true }));
+    const nextErrors = validate(next);
+    setErrors((errs) => ({ ...errs, answer: nextErrors.answer }));
+  }
+
+  function addOption() {
+    updateValues({ ...values, options: [...values.options, ''] }, ['options']);
+  }
+
+  function removeOption(idx) {
+    if (values.options.length <= MIN_MC_OPTIONS) return;
+    const nextOptions = values.options.filter((_, i) => i !== idx);
+    let nextCorrect = values.correctIndex;
+    if (idx === values.correctIndex) nextCorrect = -1;
+    else if (idx < values.correctIndex) nextCorrect = values.correctIndex - 1;
+    updateValues({ ...values, options: nextOptions, correctIndex: nextCorrect }, ['options', 'answer']);
+  }
+
+  function handleAcceptedChange(idx, text) {
+    const nextAccepted = values.accepted.map((a, i) => (i === idx ? text : a));
+    updateValues({ ...values, accepted: nextAccepted }, ['answer']);
+  }
+
+  function addAccepted() {
+    updateValues({ ...values, accepted: [...values.accepted, ''] }, ['answer']);
+  }
+
+  function removeAccepted(idx) {
+    if (values.accepted.length <= 1) return;
+    const nextAccepted = values.accepted.filter((_, i) => i !== idx);
+    updateValues({ ...values, accepted: nextAccepted }, ['answer']);
+  }
+
+  function buildContent(v) {
     const prompt = String(v.statement).trim();
     const explanation = String(v.explanation).trim();
-    if (type === 'MULTIPLE_CHOICE') {
-      return { prompt, options: splitOptions(v.options), answer: String(v.answer).trim(), ...(explanation ? { explanation } : {}) };
+    if (v.type === 'MULTIPLE_CHOICE') {
+      const options = v.options.map((text, idx) => ({
+        id: optionIdForIndex(idx),
+        text: String(text).trim(),
+      }));
+      const answerId = optionIdForIndex(v.correctIndex);
+      return {
+        prompt,
+        options,
+        answer: answerId,
+        ...(explanation ? { explanation } : {}),
+      };
     }
-    return { prompt, accepted: splitOptions(v.answer), ...(explanation ? { explanation } : {}) };
+    return {
+      prompt,
+      accepted: v.accepted.map((a) => String(a).trim()).filter(Boolean),
+      ...(explanation ? { explanation } : {}),
+    };
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     const nextErrors = validate(values);
     setErrors(nextErrors);
-    setTouched({ title: true, level: true, skill: true, objectiveId: true, type: true, statement: true, options: true, answer: true });
+    setTouched({
+      title: true,
+      level: true,
+      skill: true,
+      objectiveId: true,
+      type: true,
+      statement: true,
+      options: true,
+      answer: true,
+    });
     if (Object.values(nextErrors).some(Boolean)) return;
 
     const payload = {
@@ -174,25 +324,22 @@ export default function ActivityEditor() {
       skill: values.skill,
       objectiveId: Number(values.objectiveId),
       type: values.type,
-      ...(values.categoryId ? { categoryId: Number(values.categoryId) } : {}),
-      content: buildContent(values.type, values),
+      categoryId: values.categoryId ? Number(values.categoryId) : null,
+      content: buildContent(values),
     };
 
     setBusy(true);
     setSubmitError('');
     try {
-      const { mode } = await mutateWithFallback(
-        () => (id ? updateActivity(id, payload) : createActivity(payload)),
-        () => (id ? mockUpdateActivity(id, payload) : mockCreateActivity(payload))
-      );
-      showToast(
-        mode === 'real'
-          ? 'Actividad guardada.'
-          : 'Demo (mock): guardado local; el endpoint /content/activities todavía no existe.'
-      );
+      if (id) {
+        await updateActivity(id, payload);
+      } else {
+        await createActivity(payload);
+      }
+      showToast(id ? 'Actividad actualizada.' : 'Actividad creada.');
       navigate('/actividades');
     } catch (err) {
-      const apiError = err?.response?.data || {};
+      const apiError = extractApiError(err);
       const fieldErrors = {};
       (apiError.fieldErrors || []).forEach((f) => {
         if (f.field in values) fieldErrors[f.field] = f.message;
@@ -210,7 +357,14 @@ export default function ActivityEditor() {
   const selectField = (name, label, options, value) => (
     <div>
       <label className="form-label" htmlFor={`editor-${name}`}>{label}</label>
-      <select id={`editor-${name}`} className="input" name={name} value={value} onChange={handleChange} onBlur={handleBlur}>
+      <select
+        id={`editor-${name}`}
+        className={`input${touched[name] && errors[name] ? ' invalid' : ''}`}
+        name={name}
+        value={value}
+        onChange={handleChange}
+        onBlur={handleBlur}
+      >
         <option value="">Selecciona…</option>
         {options.map((o) => (
           <option key={o.value ?? o} value={o.value ?? o}>
@@ -228,7 +382,12 @@ export default function ActivityEditor() {
         eyebrow={role === 'ADMIN' ? 'PORTAL / ADMINISTRADOR' : 'PORTAL / PROFESOR'}
         title={id ? 'Editar actividad' : 'Crear actividad'}
       />
-      <MockNotice what="el editor de actividades (POST/PUT /content/activities)" />
+      {objectivesRemote.status === REMOTE_STATUS.error ? (
+        <ErrorState
+          message={objectivesRemote.error?.detail || 'No se pudieron cargar los objetivos.'}
+          onRetry={objectivesRemote.reload}
+        />
+      ) : null}
       <form className="card light" style={{ maxWidth: 900 }} onSubmit={handleSubmit} noValidate>
         <div className="form-2">
           <Input
@@ -261,11 +420,12 @@ export default function ActivityEditor() {
             values.categoryId
           )}
         </div>
+
         <div>
           <label className="form-label" htmlFor="statement">Enunciado</label>
           <textarea
             id="statement"
-            className="input textarea"
+            className={`input textarea${touched.statement && errors.statement ? ' invalid' : ''}`}
             name="statement"
             placeholder="Escribe la instrucción que verá el estudiante..."
             value={values.statement}
@@ -274,26 +434,110 @@ export default function ActivityEditor() {
           />
           {touched.statement && errors.statement ? <p className="error" role="alert">{errors.statement}</p> : null}
         </div>
-        <Input
-          label={values.type === 'FILL_BLANK' ? 'Respuesta(s) aceptada(s)' : 'Oración o respuesta correcta'}
-          name="answer"
-          placeholder={values.type === 'FILL_BLANK' ? 'am | was' : 'I go to school every day'}
-          help={values.type === 'FILL_BLANK' ? 'Separa varias respuestas aceptadas con el carácter |' : undefined}
-          value={values.answer}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={touched.answer ? errors.answer : ''}
-        />
-        <Input
-          label={values.type === 'FILL_BLANK' ? 'Opciones (no aplica)' : 'Opciones (mínimo 3)'}
-          name="options"
-          placeholder="am | is | are"
-          help={values.type === 'FILL_BLANK' ? 'Este campo no se usa en completar espacios.' : 'Separa las opciones con el carácter |'}
-          value={values.options}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={touched.options ? errors.options : ''}
-        />
+
+        {values.type === 'MULTIPLE_CHOICE' ? (
+          <div>
+            <span className="form-label">Opciones de respuesta (marca la correcta)</span>
+            <p className="help" style={{ marginTop: 0 }}>
+              Agrega al menos {MIN_MC_OPTIONS} opciones y selecciona el círculo de la respuesta correcta.
+            </p>
+            <div className="option-builder">
+              {values.options.map((opt, idx) => {
+                const isCorrect = values.correctIndex === idx;
+                return (
+                  <div className={`option-row${isCorrect ? ' is-correct' : ''}`} key={idx}>
+                    <input
+                      type="radio"
+                      className="option-radio"
+                      name="correctOption"
+                      aria-label={`Marcar opción ${optionLetter(idx)} como correcta`}
+                      checked={isCorrect}
+                      onChange={() => handleSelectCorrect(idx)}
+                    />
+                    <span className="option-key" aria-hidden="true">{optionLetter(idx)}</span>
+                    <input
+                      className="input"
+                      aria-label={`Texto de la opción ${optionLetter(idx)}`}
+                      placeholder={`Opción ${idx + 1}`}
+                      value={opt}
+                      onChange={(e) => handleOptionChange(idx, e.target.value)}
+                      onBlur={() => {
+                        setTouched((t) => ({ ...t, options: true }));
+                        setErrors((errs) => ({ ...errs, options: validate(values).options }));
+                      }}
+                    />
+                    {isCorrect ? <Badge color="green">Correcta</Badge> : null}
+                    {values.options.length > MIN_MC_OPTIONS ? (
+                      <button
+                        className="btn alt small option-remove"
+                        type="button"
+                        title={`Quitar opción ${optionLetter(idx)}`}
+                        aria-label={`Quitar opción ${optionLetter(idx)}`}
+                        onClick={() => removeOption(idx)}
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <button className="btn alt small" type="button" onClick={addOption}>
+                + Agregar opción
+              </button>
+            </div>
+            {touched.options && errors.options ? <p className="error" role="alert">{errors.options}</p> : null}
+            {touched.answer && errors.answer ? <p className="error" role="alert">{errors.answer}</p> : null}
+          </div>
+        ) : values.type === 'FILL_BLANK' ? (
+          <div>
+            <span className="form-label">Respuestas aceptadas</span>
+            <p className="help" style={{ marginTop: 0 }}>
+              Escribe la palabra o frase válida. Puedes agregar alternativas si hay más de una forma correcta.
+            </p>
+            <div className="option-builder">
+              {values.accepted.map((ans, idx) => (
+                <div className="option-row" key={idx}>
+                  <span className="option-key" aria-hidden="true">{idx + 1}</span>
+                  <input
+                    className="input"
+                    aria-label={`Respuesta aceptada ${idx + 1}`}
+                    placeholder={idx === 0 ? 'Ej. are' : 'Otra respuesta válida'}
+                    value={ans}
+                    onChange={(e) => handleAcceptedChange(idx, e.target.value)}
+                    onBlur={() => {
+                      setTouched((t) => ({ ...t, answer: true }));
+                      setErrors((errs) => ({ ...errs, answer: validate(values).answer }));
+                    }}
+                  />
+                  {values.accepted.length > 1 ? (
+                    <button
+                      className="btn alt small option-remove"
+                      type="button"
+                      title={`Quitar respuesta ${idx + 1}`}
+                      aria-label={`Quitar respuesta ${idx + 1}`}
+                      onClick={() => removeAccepted(idx)}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <button className="btn alt small" type="button" onClick={addAccepted}>
+                + Agregar respuesta aceptada
+              </button>
+            </div>
+            {touched.answer && errors.answer ? <p className="error" role="alert">{errors.answer}</p> : null}
+          </div>
+        ) : (
+          <p className="help" style={{ marginTop: 16 }}>
+            Selecciona primero el <b>Tipo de ejercicio</b> para agregar las opciones o respuestas.
+          </p>
+        )}
+
         <div>
           <label className="form-label" htmlFor="explanation">Explicación pedagógica</label>
           <textarea

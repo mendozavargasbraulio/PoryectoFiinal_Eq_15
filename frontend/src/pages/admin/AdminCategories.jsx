@@ -1,33 +1,27 @@
 import { useState } from 'react';
-import { ErrorState, MockNotice, PageHeader, Spinner } from '../../components/ui.jsx';
+import { ErrorState, PageHeader, Spinner } from '../../components/ui.jsx';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
 import Input from '../../components/Input.jsx';
 import { useToast } from '../../components/Toast.jsx';
-import { useRemote, mutateWithFallback, REMOTE_STATUS } from '../../api/useRemote.js';
+import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
 import {
   listCategories,
   createCategory,
   updateCategory,
   removeCategory,
 } from '../../api/categories.js';
-import {
-  mockCategoriesPage,
-  mockCreateCategory,
-  mockUpdateCategory,
-  mockRemoveCategory,
-} from '../../mock/mockServer.js';
+import { extractApiError } from '../../api/client.js';
 import { required } from '../../lib/validators.js';
 
 const PAGE_SIZE = 5;
 
-/** Patrón mock/real: GET /admin/categories con page/size/sort/name server-side;
- *  404 usa el mock con el mismo shape; 401/403/5xx muestran <ErrorState/> real.
- *  CRUD en modal y baja con <ConfirmModal/>. */
+/** CRUD de categorías (ADMIN): GET/POST/PUT/DELETE /admin/categories con
+ *  paginación y búsqueda server-side, y conteo real de actividades. */
 export default function AdminCategories() {
   const { showToast } = useToast();
 
   const [nameFilter, setNameFilter] = useState('');
-  const [appliedFilter, setAppliedFilter] = useState(''); // filtro enviado al "servidor"
+  const [appliedFilter, setAppliedFilter] = useState('');
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState(null); // null | {} (crear) | categoría (editar)
   const [toDelete, setToDelete] = useState(null);
@@ -36,12 +30,11 @@ export default function AdminCategories() {
   const { status, data, error, reload } = useRemote({
     fetcher: () =>
       listCategories({ page, size: PAGE_SIZE, sort: 'name,asc', text: appliedFilter || undefined }),
-    fallback: () => mockCategoriesPage({ page, size: PAGE_SIZE, sort: 'name,asc', text: appliedFilter }),
     deps: [page, appliedFilter],
   });
 
   const content = data?.content || [];
-  const totalPages = data?.totalPages || 1;
+  const totalPages = Math.max(1, data?.totalPages || 1);
   const currentPage = data?.page ?? page;
 
   function applyFilter(e) {
@@ -54,25 +47,16 @@ export default function AdminCategories() {
     const isNew = !editing?.id;
     setFormBusy(true);
     try {
-      const { mode } = await mutateWithFallback(
-        () =>
-          isNew
-            ? createCategory(payload)
-            : updateCategory(editing.id, payload),
-        () =>
-          isNew
-            ? mockCreateCategory(payload)
-            : mockUpdateCategory(editing.id, payload)
-      );
-      showToast(
-        mode === 'real'
-          ? 'Categoría guardada.'
-          : 'Demo (mock): guardado local; el endpoint /admin/categories todavía no existe.'
-      );
+      if (isNew) {
+        await createCategory(payload);
+      } else {
+        await updateCategory(editing.id, payload);
+      }
+      showToast(isNew ? 'Categoría creada.' : 'Categoría actualizada.');
       setEditing(null);
       reload();
     } catch (err) {
-      return err?.response?.data || { detail: 'No se pudo guardar la categoría.' };
+      return extractApiError(err);
     } finally {
       setFormBusy(false);
     }
@@ -82,19 +66,16 @@ export default function AdminCategories() {
   async function confirmDelete() {
     setFormBusy(true);
     try {
-      const { mode } = await mutateWithFallback(
-        () => removeCategory(toDelete.id),
-        () => mockRemoveCategory(toDelete.id)
-      );
-      showToast(
-        mode === 'real'
-          ? 'Categoría eliminada.'
-          : 'Demo (mock): eliminación local; el endpoint /admin/categories todavía no existe.'
-      );
+      await removeCategory(toDelete.id);
+      showToast('Categoría eliminada.');
       setToDelete(null);
-      reload();
+      if (content.length === 1 && currentPage > 0) {
+        setPage((p) => Math.max(0, p - 1));
+      } else {
+        reload();
+      }
     } catch (err) {
-      showToast(err?.response?.data?.detail || 'No se pudo eliminar la categoría.');
+      showToast(extractApiError(err).detail || 'No se pudo eliminar la categoría.');
     } finally {
       setFormBusy(false);
     }
@@ -108,31 +89,27 @@ export default function AdminCategories() {
         subtitle="Clasifica el contenido y controla la organización del banco de actividades."
       />
 
-      {status === REMOTE_STATUS.fallback ? <MockNotice what="el catálogo de categorías" /> : null}
-
       {status === REMOTE_STATUS.error ? (
         <ErrorState message={error?.detail} onRetry={reload} />
       ) : status === REMOTE_STATUS.loading ? (
         <Spinner />
       ) : (
         <>
-          <div className="filters">
-            <form className="filters" onSubmit={applyFilter}>
-              <input
-                className="input search"
-                placeholder="Buscar por nombre"
-                aria-label="Buscar por nombre"
-                value={nameFilter}
-                onChange={(e) => setNameFilter(e.target.value)}
-              />
-              <button className="btn alt small" type="submit">
-                Filtrar
-              </button>
-            </form>
-            <button className="btn small" type="button" onClick={() => setEditing({})}>
+          <form className="filters" onSubmit={applyFilter}>
+            <input
+              className="input search"
+              placeholder="Buscar por nombre"
+              aria-label="Buscar por nombre"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
+            <button className="btn alt small" type="submit">
+              Filtrar
+            </button>
+            <button className="btn coffee-outline small" type="button" onClick={() => setEditing({})}>
               Crear categoría
             </button>
-          </div>
+          </form>
 
           <div className="table-wrap">
             <table>
@@ -149,8 +126,8 @@ export default function AdminCategories() {
                   content.map((c) => (
                     <tr key={c.id}>
                       <td>{c.name}</td>
-                      <td>{c.description}</td>
-                      <td>{c.activities ?? '—'}</td>
+                      <td>{c.description || '—'}</td>
+                      <td>{c.activitiesCount ?? 0}</td>
                       <td>
                         <div className="btn-row">
                           <button className="btn alt small" type="button" onClick={() => setEditing(c)}>
@@ -201,12 +178,15 @@ export default function AdminCategories() {
         </>
       )}
 
-      <CategoryModal
-        category={editing}
-        busy={formBusy}
-        onClose={() => setEditing(null)}
-        onSave={saveCategory}
-      />
+      {editing ? (
+        <CategoryModal
+          key={editing.id ?? 'new'}
+          category={editing}
+          busy={formBusy}
+          onClose={() => setEditing(null)}
+          onSave={saveCategory}
+        />
+      ) : null}
 
       <ConfirmModal
         open={Boolean(toDelete)}
@@ -214,7 +194,7 @@ export default function AdminCategories() {
         description={
           toDelete ? `Confirma la eliminación de "${toDelete.name}".` : ''
         }
-        confirmLabel="Aceptar"
+        confirmLabel="Eliminar"
         busy={formBusy}
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
@@ -223,8 +203,7 @@ export default function AdminCategories() {
   );
 }
 
-/** Alta/edición en modal (estética .overlay/.modal del Figma), errores bajo
- *  cada input en tiempo real (react-ui-rules). */
+/** Alta/edición en modal con errores bajo cada input en tiempo real. */
 function CategoryModal({ category, busy, onClose, onSave }) {
   const isNew = !category?.id;
   const [values, setValues] = useState({
@@ -236,7 +215,8 @@ function CategoryModal({ category, busy, onClose, onSave }) {
   const [submitError, setSubmitError] = useState('');
 
   const rules = {
-    name: (v) => required(v, 'El nombre'),
+    name: (v) =>
+      required(v, 'El nombre') || (String(v || '').trim().length > 120 ? 'Máximo 120 caracteres.' : ''),
     description: (v) => (String(v || '').length > 200 ? 'Máximo 200 caracteres.' : ''),
   };
 
@@ -262,20 +242,17 @@ function CategoryModal({ category, busy, onClose, onSave }) {
     if (Object.values(nextErrors).some(Boolean)) return;
     const apiError = await onSave({
       name: values.name.trim(),
-      description: values.description.trim(),
+      description: values.description.trim() || null,
     });
     if (apiError) {
-      // fieldErrors del backend bajo cada input; el resto como mensaje del modal
       const fieldErrors = {};
       (apiError.fieldErrors || []).forEach((f) => {
         if (f.field in values) fieldErrors[f.field] = f.message;
       });
       setErrors((prev) => ({ ...prev, ...fieldErrors }));
-      setSubmitError(fieldErrors.name ? '' : apiError.detail || 'No se pudo guardar la categoría.');
+      setSubmitError(Object.keys(fieldErrors).length ? '' : apiError.detail || 'No se pudo guardar la categoría.');
     }
   }
-
-  if (!category) return null;
 
   return (
     <div

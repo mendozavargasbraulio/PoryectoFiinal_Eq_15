@@ -16,6 +16,11 @@
   --white: #fffcf6;
   --line: #c4bda8;
   --shadow: 0 14px 36px rgba(55, 48, 32, 0.1);
+
+  /* Café de marca: es el fondo del menú lateral (.side) y el tinte del
+     feedback de fallo (.feedback-wrong). Un solo valor, dos usos. */
+  --coffee: #504c40;
+  --coffee-wash: #e8e4d9; /* café muy diluido sobre --cream, solo tintes */
 }
 
 * { box-sizing: border-box; }
@@ -35,7 +40,7 @@ a:hover { text-decoration: underline; }
 /* ---------- Shell interno (sidebar + workspace) ---------- */
 .shell { display: flex; min-height: 100vh; }
 .side {
-  background: var(--graphite);
+  background: var(--coffee);
   color: #f7f2e6;
   width: 258px;
   min-width: 258px;
@@ -98,13 +103,6 @@ a:hover { text-decoration: underline; }
   color: var(--graphite);
   text-decoration: none;
 }
-.side-foot {
-  padding: 18px 20px 23px;
-  border-top: 1px solid #736e61;
-  font-size: 11px;
-  color: #ddd4c1;
-}
-.side-foot strong { display: block; color: white; margin-bottom: 4px; }
 
 .workspace { width: 100%; min-width: 0; }
 .topbar {
@@ -197,6 +195,18 @@ a:hover { text-decoration: underline; }
 }
 .btn:hover { filter: brightness(1.12); }
 .btn.alt { background: transparent; color: var(--graphite); }
+.btn.coffee-outline {
+  background: var(--white);
+  color: var(--coffee);
+  border-color: var(--coffee);
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.btn.coffee-outline:hover:not(:disabled) {
+  background: var(--coffee);
+  color: #f7f2e6;
+  border-color: var(--coffee);
+  filter: none;
+}
 .btn.rust { background: var(--rust); border-color: var(--rust); }
 .btn.olive { background: var(--olive); border-color: var(--olive); }
 .btn.small { min-height: 32px; padding: 6px 10px; font-size: 11px; }
@@ -324,15 +334,16 @@ textarea.input { min-height: 95px; resize: vertical; height: auto; }
   border-radius: 6px;
 }
 table { width: 100%; border-collapse: collapse; min-width: 670px; text-align: left; }
-thead { background: var(--paper); }
+thead { background: var(--coffee); }
 th {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #716a5c;
+  color: #f7f2e6;
   font-weight: 700;
 }
 th, td { padding: 14px 16px; border-bottom: 1px solid #d1cabb; }
+thead th { border-bottom-color: var(--coffee); }
 td { font-size: 12px; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
@@ -417,11 +428,97 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   line-height: 1.5;
 }
 .notice.warn { border-color: var(--rust); background: #f3e1db; }
+
+/* Resultado del intento: el acierto conserva el estilo base de la tarjeta; el
+   fallo (respuesta incorrecta o "Sin respuesta") se marca con el café del menú
+   lateral —misma variable que .side— en fondo y borde, con texto legible. */
+.card.light.feedback-wrong {
+  background: var(--coffee-wash);
+  border-color: var(--coffee);
+  border-left: 6px solid var(--coffee);
+}
+.feedback-wrong .notice { border-left-color: var(--coffee); background: var(--cream); }
+.feedback-wrong-tag {
+  display: inline-block;
+  background: var(--coffee);
+  color: var(--cream);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 3px;
+  margin: 0 0 12px;
+}
+
+/* Reproductor: flecha de salida junto al título, sin tocar la cuenta atrás. */
+.exercise-top { display: flex; align-items: flex-start; gap: 14px; }
+.exercise-top .back-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  margin-top: 2px;
+  font-size: 17px;
+  line-height: 1;
+}
+.exercise-top .page-head { flex: 1; min-width: 0; }
+
+/* Dominio medio en línea (Inicio del estudiante): texto + mini barra, sin card. */
+.mastery-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 22px;
+  font-size: 12px;
+  color: #736d61;
+}
+.mastery-inline b { font-size: 15px; color: var(--graphite); }
+.mastery-inline .progress-track { width: 120px; height: 7px; display: inline-block; }
+
 .footer-note { font-size: 11px; line-height: 1.5; color: #827b6b; margin-top: 22px; }
 .barline { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; font-size: 12px; }
 .barline .tiny { color: #756d5f; }
 .meter { height: 7px; background: #d0c7b4; border-radius: 10px; overflow: hidden; }
 .meter > div { background: var(--olive); height: 100%; }
+
+/* ---------- Dominio por nivel (gráfica del Inicio estudiante) ----------
+   Solo CSS: la barra reutiliza .progress-track y añade el segmento del último
+   intento (verde si subió, rojo si bajó). Nada de librerías de gráficas. */
+.mastery-group + .mastery-group { margin-top: 22px; }
+.mastery-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.mastery-group-head b { font-family: Georgia, serif; font-size: 19px; letter-spacing: 0.04em; }
+.mastery-row { margin-top: 11px; }
+.mastery-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.mastery-label b { font-weight: 700; line-height: 1.35; }
+.mastery-tags { display: flex; align-items: center; gap: 7px; white-space: nowrap; flex-shrink: 0; }
+.mastery-pct { font-weight: 700; min-width: 36px; text-align: right; }
+.mastery-delta-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 20px; }
+.mastery-delta-tag.up { color: #3c5a31; background: #dce6d5; }
+.mastery-delta-tag.down { color: #8b3e34; background: #f5ddd7; }
+.mastery-track { position: relative; height: 10px; }
+.mastery-fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--olive); border-radius: 20px; }
+.mastery-fill.blocked { background: repeating-linear-gradient(45deg, #b3a992 0 5px, #cfc6b1 5px 10px); }
+.mastery-delta { position: absolute; top: 0; bottom: 0; min-width: 2px; }
+.mastery-delta.up { background: #3c5a31; }
+.mastery-delta.down { background: var(--rust); }
 .panel-row {
   display: flex;
   justify-content: space-between;
@@ -437,6 +534,79 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
 .assign-card .form-label { margin-top: 16px; }
 .assign-card input[type='date'] { min-height: 44px; }
 
+/* ---------- Constructor de opciones tipo Forms (ActivityEditor) ---------- */
+.option-builder { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.option-row.is-correct {
+  border-color: var(--olive);
+  background: #e5ebdd;
+}
+.option-radio {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--olive);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.option-key {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--graphite);
+  flex-shrink: 0;
+}
+.option-row .input { flex: 1; min-width: 0; }
+.option-remove {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ---------- Panel de inicio profesor: tabla de progreso y flechas ---------- */
+.overview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.arrow-pager { display: flex; align-items: center; gap: 8px; }
+.arrow-btn {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+.progress-cell { min-width: 170px; }
+.progress-cell-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
 /* ---------- Modal y toast ---------- */
 .overlay {
   position: fixed;
@@ -451,10 +621,14 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   background: var(--cream);
   max-width: 460px;
   width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 28px;
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
+.modal.modal-wide { max-width: 740px; }
+.modal table { min-width: 0; }
 .modal h2 { font: 26px Georgia, serif; margin-top: 0; }
 .modal p { color: #756e5f; line-height: 1.5; }
 .toast {
@@ -476,8 +650,7 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---------- Componentes añadidos por react-ui-rules ---------- */
-/* (spinner, error de red, avatar, nota mock) — mismos colores, sin inventar estética */
+/* ---------- Componentes de estado (spinner, error de red, avatar) ---------- */
 .spinner {
   width: 26px;
   height: 26px;
@@ -524,20 +697,6 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
 .user-pill .who b { display: block; font-size: 12px; color: var(--graphite); }
 .user-pill .who span { font-size: 10px; color: var(--muted); }
 
-.mock-note {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--cream);
-  border: 1px dashed var(--line);
-  border-radius: 6px;
-  padding: 9px 14px;
-  font-size: 11px;
-  color: #736d61;
-  margin-bottom: 22px;
-}
-.mock-note::before { content: 'MOCK'; background: var(--muted); color: var(--white); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; padding: 3px 7px; border-radius: 3px; }
-
 /* ---------- Responsive (Figma: 970px y 700px) ---------- */
 @media (max-width: 970px) {
   .side { width: 212px; min-width: 212px; }
@@ -554,7 +713,6 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   .side .heading { display: none; }
   .nav { display: flex; overflow: auto; gap: 7px; padding: 8px 10px; }
   .nav button, .nav a { white-space: nowrap; padding: 9px; width: auto; }
-  .side-foot { display: none; }
   .topbar { height: auto; padding: 13px 16px; flex-wrap: wrap; }
   .canvas { padding: 23px 14px; }
   .g2, .g3, .g4, .form-2 { grid-template-columns: 1fr; }
