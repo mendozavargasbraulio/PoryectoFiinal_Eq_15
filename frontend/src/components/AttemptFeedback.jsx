@@ -1,5 +1,4 @@
-/** Normaliza las opciones a [{id,text}]. La API student devuelve `[{id,text}]`;
- *  se aceptan strings/formas antiguas por compatibilidad con el mock. */
+/** Normaliza las opciones a [{id,text}]. La API student devuelve `[{id,text}]`. */
 function normalizeOptions(options) {
   if (!Array.isArray(options)) return [];
   return options.map((o, i) =>

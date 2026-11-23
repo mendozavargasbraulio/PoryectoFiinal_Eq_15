@@ -37,7 +37,10 @@ function ObjectiveBar({ objective }) {
   const current = toPct(objective.mastery);
   const prev = objective.previousMastery == null ? null : toPct(objective.previousMastery);
   const delta = prev == null ? null : current - prev;
-  const blocked = isBlocked(objective.state);
+  const stateCode = String(objective.state || '').toUpperCase();
+  const blocked = isBlocked(stateCode);
+  const mastered = stateCode === 'MASTERED';
+  const recommended = stateCode === 'RECOMMENDED';
 
   // Segmento del último intento: rango [min, max] sobre la barra.
   const moveStart = delta == null ? 0 : Math.min(current, prev);
@@ -55,6 +58,8 @@ function ObjectiveBar({ objective }) {
         </b>
         <span className="mastery-tags">
           {blocked ? <Badge color="gray">Bloqueado</Badge> : null}
+          {mastered ? <Badge color="green">Dominado</Badge> : null}
+          {recommended ? <Badge color="gold">Recomendado</Badge> : null}
           {delta == null ? (
             <span className="smallprint">nueva</span>
           ) : (
