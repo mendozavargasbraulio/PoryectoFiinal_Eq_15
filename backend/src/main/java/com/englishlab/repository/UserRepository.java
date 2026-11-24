@@ -1,6 +1,7 @@
 package com.englishlab.repository;
 
 import com.englishlab.model.entity.User;
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -8,6 +9,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
@@ -24,6 +28,11 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
+    /** Purga de cuentas que nunca verificaron el correo (las FKs de la BD hacen cascade/set null). */
+    @Modifying
+    @Query("delete from User u where u.emailVerified = false and u.createdAt < :cutoff")
+    int deleteUnverifiedCreatedBefore(@Param("cutoff") Instant cutoff);
 
     /**
      * Lista con filtros dinámicos (Specification) y fetch de las asociaciones to-one

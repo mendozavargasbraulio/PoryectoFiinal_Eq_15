@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTOs de autenticación: registro, login y recuperación de contraseña.
+ * DTOs de autenticación: registro, login, verificación de correo y recuperación de contraseña.
  */
 public final class AuthDtos {
 
@@ -58,6 +58,36 @@ public final class AuthDtos {
             )
             String newPassword
     ) {}
+
+    /** Reenvío del correo de verificación; la respuesta es idéntica exista o no la cuenta. */
+    public record ResendVerificationRequest(
+            @NotBlank(message = "El email es obligatorio")
+            @Email(message = "El email no es válido")
+            @Size(max = 255, message = "El email no puede superar los 255 caracteres")
+            String email
+    ) {}
+
+    public record VerifyEmailRequest(
+            @NotBlank(message = "El token es obligatorio")
+            @Size(max = 128, message = "Token inválido")
+            String token
+    ) {}
+
+    /** ID token (JWT) que entrega Google Identity Services en el campo {@code credential}. */
+    public record GoogleSignInRequest(
+            @NotBlank(message = "La credencial de Google es obligatoria")
+            @Size(max = 8192, message = "Credencial inválida")
+            String credential
+    ) {}
+
+    /**
+     * Resultado del acceso con Google: {@code session} si ya hay sesión (HTTP 200) o
+     * {@code pending} si la cuenta queda pendiente de verificar por correo (HTTP 202).
+     */
+    public record GoogleSignInResult(AuthResponse session, MessageResponse pending) {}
+
+    /** Respuesta genérica (registro y reenvío): no distingue cuentas nuevas de existentes. */
+    public record MessageResponse(String message) {}
 
     public record UserResponse(Long id, String name, String email, String role) {}
 

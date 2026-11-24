@@ -78,6 +78,9 @@ public class AdminUserService {
         user.setRole(role);
         user.setPhone(request.phone());
         user.setCreatedAt(Instant.now());
+        // Alta hecha por un ADMIN: no hay registro público que verificar.
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(user.getCreatedAt());
         if (request.teacherId() != null) {
             user.setTeacher(resolveTeacher(request.teacherId()));
         }

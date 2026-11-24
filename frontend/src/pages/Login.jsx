@@ -3,12 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 import Input from '../components/Input.jsx';
 import { Spinner } from '../components/ui.jsx';
+import ResendVerification from '../components/ResendVerification.jsx';
+import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import client, { extractApiError, SESSION_EXPIRED_KEY } from '../api/client.js';
 import { useAuth, homePathForRole } from '../auth/AuthContext.jsx';
 import { email as validateEmail, required } from '../lib/validators.js';
 
 function isAllowedForRole(path, role) {
-  if (!path || path === '/' || path === '/login' || path === '/registro' || path === '/recuperar' || path === '/restablecer') {
+  if (!path || path === '/' || path === '/login' || path === '/registro' || path === '/recuperar' || path === '/restablecer' || path === '/verificar-correo') {
     return false;
   }
   if (role === 'STUDENT') return path.startsWith('/estudiante/');
@@ -37,6 +39,9 @@ export default function Login() {
   const [submitError, setSubmitError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [googleNotice, setGoogleNotice] = useState('');
+  const justVerified = Boolean(location.state?.verified);
 
   // El interceptor 401 deja una marca antes de redirigir; se consume una sola vez.
   useEffect(() => {
@@ -68,6 +73,13 @@ export default function Login() {
     setErrors((errs) => ({ ...errs, [name]: rules[name](value) }));
   };
 
+  function enterWithSession(data) {
+    login(data.token, data.user);
+    const from = location.state?.from;
+    const role = data.user?.role;
+    navigate(isAllowedForRole(from, role) ? from : homePathForRole(role), { replace: true });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const nextErrors = {};
@@ -78,16 +90,13 @@ export default function Login() {
 
     setBusy(true);
     setSubmitError('');
+    setNeedsVerification(false);
     try {
       const { data } = await client.post('/auth/login', {
         email: values.email.trim(),
         password: values.password,
       });
-      login(data.token, data.user);
-      const from = location.state?.from;
-      const role = data.user?.role;
-      const target = isAllowedForRole(from, role) ? from : homePathForRole(role);
-      navigate(target, { replace: true });
+      enterWithSession(data);
     } catch (err) {
       const apiError = extractApiError(err);
       const fieldErrors = {};
@@ -95,7 +104,11 @@ export default function Login() {
         if (f.field in values) fieldErrors[f.field] = f.message;
       });
       setErrors((prev) => ({ ...prev, ...fieldErrors }));
-      if (!Object.keys(fieldErrors).length) {
+      if (apiError.status === 403 && apiError.code === 'EMAIL_NOT_VERIFIED') {
+        // Contraseña correcta pero cuenta sin verificar: no hay sesión; ofrece reenviar el enlace.
+        setNeedsVerification(true);
+        setSubmitError('Aún no has verificado tu correo. Abre el enlace que te enviamos o solicita uno nuevo.');
+      } else if (!Object.keys(fieldErrors).length) {
         setSubmitError(
           apiError.status === 401
             ? 'Credenciales inválidas. Revisa tu correo y contraseña.'
@@ -111,11 +124,26 @@ export default function Login() {
     <AuthLayout>
       <h1>Bienvenido de nuevo.</h1>
       <p className="muted">Ingresa para continuar tu aprendizaje.</p>
+      {justVerified ? (
+        <div className="notice" role="status" style={{ margin: '4px 0 16px' }}>
+          <span><b>Correo verificado.</b> Ya puedes iniciar sesión.</span>
+        </div>
+      ) : null}
       {sessionExpired ? (
         <div className="notice" role="status" style={{ margin: '4px 0 16px' }}>
           <span>Tu sesión expiró. Inicia sesión de nuevo.</span>
         </div>
       ) : null}
+      {googleNotice ? (
+        <div className="notice" role="status" style={{ margin: '4px 0 16px' }}>
+          <span>{googleNotice}</span>
+        </div>
+      ) : null}
+      <GoogleSignInButton
+        onSession={enterWithSession}
+        onPending={(message) => { setSubmitError(''); setGoogleNotice(message); }}
+        onError={(apiError) => { setGoogleNotice(''); setSubmitError(apiError.detail); }}
+      />
       <form onSubmit={handleSubmit} noValidate>
         <Input
           label="Correo electrónico"
@@ -143,6 +171,7 @@ export default function Login() {
           <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
         </div>
         {submitError ? <p className="form-status" role="alert">{submitError}</p> : null}
+        {needsVerification ? <ResendVerification email={values.email.trim()} /> : null}
         <button className="btn wide" type="submit" disabled={busy}>
           {busy ? 'Ingresando…' : 'Iniciar sesión'}
         </button>

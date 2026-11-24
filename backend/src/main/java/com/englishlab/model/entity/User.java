@@ -47,4 +47,11 @@ public class User {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    /** false hasta que el titular confirma el correo (o Google lo certifica). Sin verificar no hay login. */
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
 }

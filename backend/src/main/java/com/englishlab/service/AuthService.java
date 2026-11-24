@@ -4,10 +4,14 @@ import com.englishlab.config.AppConfig.AuthProperties;
 import com.englishlab.dto.AuthDtos.AuthResponse;
 import com.englishlab.dto.AuthDtos.ForgotPasswordRequest;
 import com.englishlab.dto.AuthDtos.LoginRequest;
+import com.englishlab.dto.AuthDtos.MessageResponse;
 import com.englishlab.dto.AuthDtos.RegisterRequest;
+import com.englishlab.dto.AuthDtos.ResendVerificationRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordRequest;
 import com.englishlab.dto.AuthDtos.UserResponse;
+import com.englishlab.dto.AuthDtos.VerifyEmailRequest;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
+import com.englishlab.exception.AppExceptions.EmailNotVerifiedException;
 import com.englishlab.exception.AppExceptions.InvalidCredentialsException;
 import com.englishlab.model.entity.PasswordResetToken;
 import com.englishlab.model.entity.RevokedToken;
@@ -20,22 +24,18 @@ import com.englishlab.repository.RoleRepository;
 import com.englishlab.repository.UserRepository;
 import com.englishlab.security.JwtService;
 import com.englishlab.security.JwtService.AuthenticatedUser;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import com.englishlab.util.AfterCommit;
+import com.englishlab.util.TokenUtils;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class AuthService {
@@ -46,6 +46,12 @@ public class AuthService {
     private static final Duration RESET_TOKEN_TTL = Duration.ofMinutes(30);
     private static final int RESET_TOKEN_BYTES = 32;
 
+    /** Misma respuesta para registros nuevos, correos ya registrados y reenvíos: evita enumerar cuentas. */
+    static final String REGISTRATION_MESSAGE = "Si el correo puede registrarse, te hemos enviado un enlace "
+            + "de verificación. Revisa tu bandeja de entrada y la carpeta de spam.";
+    static final String RESEND_MESSAGE = "Si existe una cuenta pendiente de verificar para ese correo, "
+            + "te enviaremos un nuevo enlace en unos minutos.";
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final RevokedTokenRepository revokedTokenRepository;
@@ -54,6 +60,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthProperties authProperties;
     private final NotificationService notificationService;
+    private final EmailVerificationService emailVerificationService;
 
     public AuthService(
             UserRepository userRepository,
@@ -63,7 +70,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             AuthProperties authProperties,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            EmailVerificationService emailVerificationService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.revokedTokenRepository = revokedTokenRepository;
@@ -72,31 +80,55 @@ public class AuthService {
         this.jwtService = jwtService;
         this.authProperties = authProperties;
         this.notificationService = notificationService;
+        this.emailVerificationService = emailVerificationService;
     }
 
+    /**
+     * Registro con correo y contraseña. Crea la cuenta SIN verificar y envía el enlace de
+     * verificación; no emite JWT. La respuesta es la misma si el correo ya existía.
+     */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public MessageResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new BusinessRuleException("El email ya está registrado");
+        // Se calcula SIEMPRE (también si el correo ya existe) para que el tiempo de respuesta
+        // no delate si la cuenta existe.
+        String passwordHash = passwordEncoder.encode(request.password());
+
+        Optional<User> existing = userRepository.findByEmailIgnoreCase(email);
+        if (existing.isPresent()) {
+            // Cuenta pendiente: reenvía el enlace (con límites). Cuenta verificada: no hace nada.
+            // Nunca se modifica la contraseña de una cuenta existente desde el registro.
+            emailVerificationService.resendIfAllowed(existing.get());
+            return new MessageResponse(REGISTRATION_MESSAGE);
         }
+
         Role studentRole = roleRepository.findByName(RoleName.STUDENT)
                 .orElseThrow(() -> new IllegalStateException(
                         "Rol STUDENT no encontrado en la base de datos; ¿se aplicaron las migraciones/seed?"));
         User user = new User();
         user.setName(request.name().trim());
         user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setPasswordHash(passwordHash);
         user.setRole(studentRole);
         user.setCreatedAt(Instant.now());
+        user.setEmailVerified(false);
         user = userRepository.save(user);
 
-        final Long savedUserId = user.getId();
-        final String savedEmail = user.getEmail();
-        notifyAfterCommit(() -> notificationService.sendWelcome(savedUserId, savedEmail));
+        emailVerificationService.issueAndSend(user);
+        return new MessageResponse(REGISTRATION_MESSAGE);
+    }
 
-        String token = jwtService.generateToken(user.getId(), RoleName.STUDENT);
-        return new AuthResponse(token, toResponse(user));
+    /** Consume el token del enlace; solo entonces la cuenta queda verificada. */
+    @Transactional
+    public void verifyEmail(VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token());
+    }
+
+    /** Reenvío del enlace: siempre la misma respuesta, exista o no la cuenta. */
+    @Transactional
+    public MessageResponse resendVerification(ResendVerificationRequest request) {
+        emailVerificationService.resend(normalizeEmail(request.email()));
+        return new MessageResponse(RESEND_MESSAGE);
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +138,10 @@ public class AuthService {
                 .orElseThrow(() -> new InvalidCredentialsException("Credenciales inválidas"));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Credenciales inválidas");
+        }
+        // Solo tras acreditar la contraseña (así no se revela nada a quien no la conoce).
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException("Debes verificar tu correo electrónico antes de iniciar sesión.");
         }
         String token = jwtService.generateToken(user.getId(), user.getRole().getName());
         return new AuthResponse(token, toResponse(user));
@@ -129,8 +165,8 @@ public class AuthService {
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = normalizeEmail(request.email());
         userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
-            String rawToken = generateResetToken();
-            String tokenHash = sha256Hex(rawToken);
+            String rawToken = TokenUtils.newHexToken(RESET_TOKEN_BYTES);
+            String tokenHash = TokenUtils.sha256Hex(rawToken);
 
             PasswordResetToken prt = new PasswordResetToken();
             prt.setUser(user);
@@ -148,13 +184,13 @@ public class AuthService {
             final Long userId = user.getId();
             final String userEmail = user.getEmail();
             final String token = rawToken;
-            notifyAfterCommit(() -> notificationService.sendPasswordReset(userId, userEmail, token));
+            AfterCommit.run(() -> notificationService.sendPasswordReset(userId, userEmail, token));
         });
     }
 
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        String tokenHash = sha256Hex(request.token());
+        String tokenHash = TokenUtils.sha256Hex(request.token());
         PasswordResetToken prt = passwordResetTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessRuleException("Token inválido o expirado"));
         if (prt.getUsedAt() != null) {
@@ -173,38 +209,8 @@ public class AuthService {
         return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().getName().name());
     }
 
-    /** Ejecuta la acción tras el commit (si hay transacción activa) para no romper el flujo ni dejar FKs inconsistentes. */
-    private void notifyAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            });
-        } else {
-            action.run();
-        }
-    }
-
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String generateResetToken() {
-        byte[] bytes = new byte[RESET_TOKEN_BYTES];
-        new SecureRandom().nextBytes(bytes);
-        return HexFormat.of().formatHex(bytes);
-    }
-
-    private String sha256Hex(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no disponible", e);
-        }
     }
 
     /**
