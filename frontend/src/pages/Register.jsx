@@ -21,8 +21,8 @@ export default function Register() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [googlePending, setGooglePending] = useState('');
-  const [values, setValues] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  const [errors, setErrors] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [values, setValues] = useState({ name: '', email: '', password: '', confirmPassword: '', phone: '' });
+  const [errors, setErrors] = useState({ name: '', email: '', password: '', confirmPassword: '', phone: '' });
   const [touched, setTouched] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,6 +36,15 @@ export default function Register() {
       || (String(v || '').trim().length > 255 ? 'Máximo 255 caracteres.' : ''),
     password: (v) => validatePassword(v),
     confirmPassword: (v) => required(v, 'Confirmar contraseña') || matchesPassword(v, values.password),
+    phone: (v) => {
+      const raw = String(v || '').trim();
+      if (!raw) return '';
+      const cleaned = raw.replace(/[\s\-().]+/g, '');
+      if (cleaned.length > 20 || !/^\+[1-9]\d{7,14}$/.test(cleaned)) {
+        return 'Usa formato internacional con lada (ej. +529511234567).';
+      }
+      return '';
+    },
   };
 
   const handleChange = (e) => {
@@ -74,6 +83,7 @@ export default function Register() {
         name: values.name.trim(),
         email: values.email.trim(),
         password: values.password,
+        phone: values.phone.trim() || null,
       });
       // El backend responde igual exista o no el correo (no revela cuentas).
       setSentTo(values.email.trim());
@@ -180,6 +190,18 @@ export default function Register() {
           onChange={handleChange}
           onBlur={handleBlur}
           error={touched.confirmPassword ? errors.confirmPassword : ''}
+        />
+        <Input
+          label="Teléfono (opcional)"
+          name="phone"
+          type="tel"
+          placeholder="+529511234567"
+          autoComplete="tel"
+          help="Opcional: registra tu teléfono con lada internacional para recuperar tu contraseña mediante SMS."
+          value={values.phone}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          error={touched.phone ? errors.phone : ''}
         />
         {submitError ? <p className="form-status" role="alert">{submitError}</p> : null}
         <button className="btn wide" type="submit" disabled={busy} style={{ marginTop: 14 }}>

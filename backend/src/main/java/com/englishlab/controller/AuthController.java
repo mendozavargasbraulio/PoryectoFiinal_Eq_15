@@ -2,6 +2,7 @@ package com.englishlab.controller;
 
 import com.englishlab.dto.AuthDtos.AuthResponse;
 import com.englishlab.dto.AuthDtos.ForgotPasswordRequest;
+import com.englishlab.dto.AuthDtos.ForgotPasswordSmsRequest;
 import com.englishlab.dto.AuthDtos.GoogleSignInRequest;
 import com.englishlab.dto.AuthDtos.GoogleSignInResult;
 import com.englishlab.dto.AuthDtos.LoginRequest;
@@ -9,6 +10,7 @@ import com.englishlab.dto.AuthDtos.MessageResponse;
 import com.englishlab.dto.AuthDtos.RegisterRequest;
 import com.englishlab.dto.AuthDtos.ResendVerificationRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordRequest;
+import com.englishlab.dto.AuthDtos.ResetPasswordSmsRequest;
 import com.englishlab.dto.AuthDtos.VerifyEmailRequest;
 import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.AuthService;
@@ -87,5 +89,15 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/forgot-password/sms")
+    public ResponseEntity<MessageResponse> forgotPasswordBySms(@Valid @RequestBody ForgotPasswordSmsRequest request) {
+        return ResponseEntity.ok(authService.forgotPasswordBySms(request));
+    }
+
+    @PostMapping("/reset-password/sms")
+    public ResponseEntity<MessageResponse> resetPasswordBySms(@Valid @RequestBody ResetPasswordSmsRequest request) {
+        return ResponseEntity.ok(authService.resetPasswordBySms(request));
     }
 }

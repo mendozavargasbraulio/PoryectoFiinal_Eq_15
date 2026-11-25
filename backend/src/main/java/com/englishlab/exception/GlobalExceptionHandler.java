@@ -8,6 +8,7 @@ import com.englishlab.exception.AppExceptions.EmailVerificationException;
 import com.englishlab.exception.AppExceptions.GoogleAuthUnavailableException;
 import com.englishlab.exception.AppExceptions.InvalidCredentialsException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
+import com.englishlab.exception.AppExceptions.SmsVerificationUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
@@ -124,6 +125,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(GoogleAuthUnavailableException.class)
     public ResponseEntity<ProblemDetail> handleGoogleUnavailable(GoogleAuthUnavailableException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(pd);
+    }
+
+    @ExceptionHandler(SmsVerificationUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleSmsVerificationUnavailable(
+            SmsVerificationUnavailableException ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(pd);
     }

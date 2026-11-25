@@ -29,7 +29,10 @@ public final class AuthDtos {
                     regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
                     message = "La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial"
             )
-            String password
+            String password,
+
+            @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
+            String phone
     ) {}
 
     public record LoginRequest(
@@ -49,6 +52,30 @@ public final class AuthDtos {
     public record ResetPasswordRequest(
             @NotBlank(message = "El token es obligatorio")
             String token,
+
+            @NotBlank(message = "La nueva contraseña es obligatoria")
+            @Size(max = 72, message = "La contraseña no puede superar los 72 caracteres")
+            @Pattern(
+                    regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
+                    message = "La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial"
+            )
+            String newPassword
+    ) {}
+
+    public record ForgotPasswordSmsRequest(
+            @NotBlank(message = "El teléfono es obligatorio")
+            @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
+            String phone
+    ) {}
+
+    public record ResetPasswordSmsRequest(
+            @NotBlank(message = "El teléfono es obligatorio")
+            @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
+            String phone,
+
+            @NotBlank(message = "El código es obligatorio")
+            @Pattern(regexp = "^\\d{4,10}$", message = "El código debe contener solo dígitos")
+            String code,
 
             @NotBlank(message = "La nueva contraseña es obligatoria")
             @Size(max = 72, message = "La contraseña no puede superar los 72 caracteres")
