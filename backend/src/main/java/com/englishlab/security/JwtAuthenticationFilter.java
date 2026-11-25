@@ -51,6 +51,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // El usuario debe seguir existiendo y el rol se toma de la BD, no del claim:
                     // un token de un usuario borrado o degradado deja de valer al instante.
                     userRepository.findById(claims.id()).ifPresent(entity -> {
+                        // Defensa en profundidad: nunca se emite JWT sin verificar, pero si existiera
+                        // uno (cuenta degradada, token antiguo) tampoco autentica.
+                        if (!entity.isEmailVerified()) {
+                            return;
+                        }
                         AuthenticatedUser user = new AuthenticatedUser(
                                 entity.getId(), entity.getRole().getName(), claims.jti(), claims.expiresAt());
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

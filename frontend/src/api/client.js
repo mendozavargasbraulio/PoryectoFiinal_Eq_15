@@ -70,7 +70,7 @@ client.interceptors.response.use(
   }
 );
 
-/** Normaliza el ProblemDetail del backend a {title, detail, status, fieldErrors}. */
+/** Normaliza el ProblemDetail del backend a {title, detail, status, code, fieldErrors}. */
 export function extractApiError(error) {
   const data = error?.response?.data;
   if (!error.response) {
@@ -78,6 +78,7 @@ export function extractApiError(error) {
       status: 0,
       title: 'Sin conexión',
       detail: 'No se pudo contactar al servidor. Revisa tu conexión e intenta de nuevo.',
+      code: null,
       fieldErrors: [],
     };
   }
@@ -86,6 +87,8 @@ export function extractApiError(error) {
     status: data?.status ?? error.response.status,
     title: data?.title || 'Error',
     detail: data?.detail || 'Ocurrió un problema. Intenta de nuevo.',
+    /** Código de negocio opcional: EMAIL_NOT_VERIFIED, INVALID, EXPIRED, USED. */
+    code: data?.code ?? null,
     fieldErrors: fieldErrors.map((f) => ({ field: f.field, message: f.message })),
   };
 }

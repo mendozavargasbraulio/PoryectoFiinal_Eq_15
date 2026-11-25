@@ -1,5 +1,6 @@
 package com.englishlab.config;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -17,7 +18,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableConfigurationProperties({
         AppConfig.AuthProperties.class,
         AppConfig.MailProperties.class,
-        AppConfig.JwtProperties.class
+        AppConfig.JwtProperties.class,
+        AppConfig.VerificationProperties.class,
+        AppConfig.GoogleProperties.class
 })
 public class AppConfig implements WebMvcConfigurer {
 
@@ -35,17 +38,41 @@ public class AppConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
-    /** Autenticación; el log del token de recuperación es solo para desarrollo local. */
+    /** Autenticación; los logs de tokens/enlaces son solo para desarrollo local. */
     @ConfigurationProperties(prefix = "app.auth")
     public record AuthProperties(
-            @DefaultValue("false") boolean logResetToken
+            @DefaultValue("false") boolean logResetToken,
+            @DefaultValue("false") boolean logVerificationLink
+    ) {}
+
+    /**
+     * Verificación de correo. {@code frontendBaseUrl} debe ser HTTPS (se admite http solo en
+     * localhost para desarrollo); el enlace del correo es {@code frontendBaseUrl + path + "?token=..."}.
+     */
+    @ConfigurationProperties(prefix = "app.verification")
+    public record VerificationProperties(
+            @DefaultValue("https://english-labeq15.tech") String frontendBaseUrl,
+            @DefaultValue("/verificar-correo") String path,
+            @DefaultValue("24h") Duration tokenTtl,
+            @DefaultValue("60s") Duration resendCooldown,
+            @DefaultValue("5") int maxSendsPerHour,
+            @DefaultValue("7d") Duration unverifiedRetention
     ) {}
 
     /** Correo; con {@code enabled=false} no se exige un servidor SMTP. */
     @ConfigurationProperties(prefix = "app.mail")
     public record MailProperties(
             @DefaultValue("false") boolean enabled,
-            @DefaultValue("no-reply@englishlab.local") String from
+            @DefaultValue("noreply@english-labeq15.tech") String from
+    ) {}
+
+    /**
+     * Inicio de sesión / registro con Google. {@code clientId} es el OAuth Client ID (público) de
+     * Google Cloud; el ID token solo se acepta si su {@code aud} coincide. Vacío = función desactivada.
+     */
+    @ConfigurationProperties(prefix = "app.google")
+    public record GoogleProperties(
+            @DefaultValue("") String clientId
     ) {}
 
     /**

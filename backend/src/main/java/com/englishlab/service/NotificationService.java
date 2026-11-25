@@ -6,12 +6,16 @@ import com.englishlab.model.entity.NotificationsLog.NotificationChannel;
 import com.englishlab.model.entity.NotificationsLog.NotificationStatus;
 import com.englishlab.repository.NotificationsLogRepository;
 import com.englishlab.repository.UserRepository;
+import jakarta.mail.internet.MimeMessage;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +31,7 @@ public class NotificationService {
 
     public static final String TYPE_WELCOME = "WELCOME";
     public static final String TYPE_PASSWORD_RESET = "PASSWORD_RESET";
+    public static final String TYPE_EMAIL_VERIFICATION = "EMAIL_VERIFICATION";
 
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final NotificationsLogRepository notificationsLogRepository;
@@ -56,7 +61,21 @@ public class NotificationService {
                 "Usa este token para restablecer tu contraseña: " + rawToken, TYPE_PASSWORD_RESET);
     }
 
+    /** Correo HTML (con alternativa en texto) con el enlace de verificación. */
+    @Async
+    public void sendEmailVerification(Long userId, String to, String name, String link, Duration ttl) {
+        send(userId, to, EmailVerificationTemplate.SUBJECT,
+                EmailVerificationTemplate.text(name, link, ttl),
+                EmailVerificationTemplate.html(name, link, ttl),
+                TYPE_EMAIL_VERIFICATION);
+    }
+
     private void send(Long userId, String to, String subject, String body, String type) {
+        send(userId, to, subject, body, null, type);
+    }
+
+    /** {@code html == null} -> texto plano; si no, multipart text + html. */
+    private void send(Long userId, String to, String subject, String body, String html, String type) {
         // Con el envío desactivado no se ha mandado nada: la fila queda PENDING, no SENT.
         NotificationStatus status = mailProperties.enabled() ? NotificationStatus.SENT : NotificationStatus.PENDING;
         String error = null;
@@ -66,12 +85,22 @@ public class NotificationService {
                 if (sender == null) {
                     throw new IllegalStateException("JavaMailSender no disponible (¿spring.mail.host configurado?)");
                 }
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setFrom(mailProperties.from());
-                message.setTo(to);
-                message.setSubject(subject);
-                message.setText(body);
-                sender.send(message);
+                if (html == null) {
+                    SimpleMailMessage message = new SimpleMailMessage();
+                    message.setFrom(mailProperties.from());
+                    message.setTo(to);
+                    message.setSubject(subject);
+                    message.setText(body);
+                    sender.send(message);
+                } else {
+                    MimeMessage mime = sender.createMimeMessage();
+                    MimeMessageHelper helper = new MimeMessageHelper(mime, true, StandardCharsets.UTF_8.name());
+                    helper.setFrom(mailProperties.from(), "English Lab");
+                    helper.setTo(to);
+                    helper.setSubject(subject);
+                    helper.setText(body, html);
+                    sender.send(mime);
+                }
             }
         } catch (Exception e) {
             status = NotificationStatus.FAILED;

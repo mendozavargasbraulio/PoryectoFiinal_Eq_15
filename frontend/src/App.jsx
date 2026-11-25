@@ -7,6 +7,7 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 import StudentHome from './pages/student/StudentHome.jsx';
@@ -40,6 +41,8 @@ export default function App() {
       <Route path="/registro" element={<PublicOnly><Register /></PublicOnly>} />
       <Route path="/recuperar" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
       <Route path="/restablecer" element={<PublicOnly><ResetPassword /></PublicOnly>} />
+      {/* Destino del enlace del correo: sin PublicOnly, funciona aunque haya otra sesión abierta */}
+      <Route path="/verificar-correo" element={<VerifyEmail />} />
 
       {/* Estudiante */}
       <Route

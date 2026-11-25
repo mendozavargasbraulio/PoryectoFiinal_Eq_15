@@ -2,11 +2,17 @@ package com.englishlab.controller;
 
 import com.englishlab.dto.AuthDtos.AuthResponse;
 import com.englishlab.dto.AuthDtos.ForgotPasswordRequest;
+import com.englishlab.dto.AuthDtos.GoogleSignInRequest;
+import com.englishlab.dto.AuthDtos.GoogleSignInResult;
 import com.englishlab.dto.AuthDtos.LoginRequest;
+import com.englishlab.dto.AuthDtos.MessageResponse;
 import com.englishlab.dto.AuthDtos.RegisterRequest;
+import com.englishlab.dto.AuthDtos.ResendVerificationRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordRequest;
+import com.englishlab.dto.AuthDtos.VerifyEmailRequest;
 import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.AuthService;
+import com.englishlab.service.GoogleAuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,19 +27,48 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final GoogleAuthService googleAuthService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, GoogleAuthService googleAuthService) {
         this.authService = authService;
+        this.googleAuthService = googleAuthService;
     }
 
+    /** 202: la cuenta queda pendiente de verificar; NO se devuelve JWT. */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(authService.register(request));
+    }
+
+    /** POST (no GET) para que los antivirus/prefetch de los clientes de correo no consuman el token. */
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<MessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        return ResponseEntity.ok(authService.resendVerification(request));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    /**
+     * Registro/inicio de sesión con Google (ID token en {@code credential}). 200 con el mismo
+     * {@code AuthResponse} que el login tradicional; 202 si Google no certificó el correo y la cuenta
+     * queda pendiente del enlace de verificación.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<?> google(@Valid @RequestBody GoogleSignInRequest request) {
+        GoogleSignInResult result = googleAuthService.signIn(request.credential());
+        if (result.session() != null) {
+            return ResponseEntity.ok(result.session());
+        }
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(result.pending());
     }
 
     @PostMapping("/logout")

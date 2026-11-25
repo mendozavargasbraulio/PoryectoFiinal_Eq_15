@@ -3,6 +3,9 @@ package com.englishlab.exception;
 import com.englishlab.exception.AppExceptions.ApiFieldError;
 import com.englishlab.exception.AppExceptions.BadRequestException;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
+import com.englishlab.exception.AppExceptions.EmailNotVerifiedException;
+import com.englishlab.exception.AppExceptions.EmailVerificationException;
+import com.englishlab.exception.AppExceptions.GoogleAuthUnavailableException;
 import com.englishlab.exception.AppExceptions.InvalidCredentialsException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -102,6 +105,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleInvalidCredentials(InvalidCredentialsException ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.UNAUTHORIZED, ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(pd);
+    }
+
+    /** Token de verificación inválido/expirado/usado: el frontend decide qué mostrar según {@code code}. */
+    @ExceptionHandler(EmailVerificationException.class)
+    public ResponseEntity<ProblemDetail> handleEmailVerification(EmailVerificationException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+        pd.setProperty("code", ex.getReason().name());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(pd);
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ProblemDetail> handleEmailNotVerified(EmailNotVerifiedException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
+        pd.setProperty("code", "EMAIL_NOT_VERIFIED");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(pd);
+    }
+
+    @ExceptionHandler(GoogleAuthUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleGoogleUnavailable(GoogleAuthUnavailableException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(pd);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

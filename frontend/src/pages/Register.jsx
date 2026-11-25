@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 import Input from '../components/Input.jsx';
 import client, { extractApiError } from '../api/client.js';
+import ResendVerification from '../components/ResendVerification.jsx';
+import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import { useAuth, homePathForRole } from '../auth/AuthContext.jsx';
 import {
   email as validateEmail,
@@ -11,16 +13,20 @@ import {
   required,
 } from '../lib/validators.js';
 
-/** El registro público SIEMPRE crea STUDENT; el rol lo confirma el backend. */
+/**
+ * El registro público SIEMPRE crea STUDENT. No inicia sesión: el backend deja la cuenta
+ * pendiente y envía un enlace de verificación al correo.
+ */
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
-
+  const { login } = useAuth();
+  const [googlePending, setGooglePending] = useState('');
   const [values, setValues] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [touched, setTouched] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState('');
 
   const rules = {
     name: (v) => required(v, 'El nombre') || (String(v || '').trim().length > 120 ? 'Máximo 120 caracteres.' : ''),
@@ -64,13 +70,13 @@ export default function Register() {
     setBusy(true);
     setSubmitError('');
     try {
-      const { data } = await client.post('/auth/register', {
+      await client.post('/auth/register', {
         name: values.name.trim(),
         email: values.email.trim(),
         password: values.password,
       });
-      register(data.token, data.user);
-      navigate(homePathForRole(data.user?.role), { replace: true });
+      // El backend responde igual exista o no el correo (no revela cuentas).
+      setSentTo(values.email.trim());
     } catch (err) {
       const apiError = extractApiError(err);
       const fieldErrors = {};
@@ -79,21 +85,57 @@ export default function Register() {
       });
       setErrors((prev) => ({ ...prev, ...fieldErrors }));
       if (!Object.keys(fieldErrors).length) {
-        setSubmitError(
-          apiError.status === 422
-            ? 'Ese correo ya está registrado. Inicia sesión o usa otro correo.'
-            : apiError.detail
-        );
+        setSubmitError(apiError.detail);
       }
     } finally {
       setBusy(false);
     }
   }
 
+  if (googlePending) {
+    return (
+      <AuthLayout>
+        <h1>Revisa tu correo.</h1>
+        <div className="notice" role="status"><span>{googlePending}</span></div>
+        <div className="auth-links">
+          <Link to="/login">Ir a iniciar sesión</Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (sentTo) {
+    return (
+      <AuthLayout>
+        <h1>Revisa tu correo.</h1>
+        <div className="notice" role="status">
+          <span>
+            Si <b>{sentTo}</b> puede registrarse, te enviamos un enlace para verificar tu cuenta.
+            Ábrelo para activarla; después podrás iniciar sesión. Si no lo ves, revisa la carpeta de spam.
+          </span>
+        </div>
+        <ResendVerification email={sentTo} startCooldown />
+        <div className="auth-links">
+          <Link to="/login">Ir a iniciar sesión</Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout>
       <h1>Crea tu cuenta.</h1>
       <p className="muted">Regístrate para comenzar a aprender.</p>
+      {/* Registro con Google: el backend crea una cuenta STUDENT (o inicia sesión si ya existe). */}
+      <GoogleSignInButton
+        text="signup_with"
+        onSession={(data) => {
+          login(data.token, data.user);
+          navigate(homePathForRole(data.user?.role), { replace: true });
+        }}
+        onPending={setGooglePending}
+        onError={(apiError) => setSubmitError(apiError.detail)}
+      />
       <form onSubmit={handleSubmit} noValidate>
         <Input
           label="Nombre completo"
