@@ -69,7 +69,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/verify-email",
                                 "/api/v1/auth/resend-verification",
                                 "/api/v1/auth/forgot-password",
-                                "/api/v1/auth/reset-password").permitAll()
+                                "/api/v1/auth/reset-password",
+                                "/api/v1/auth/forgot-password/sms",
+                                "/api/v1/auth/reset-password/sms").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

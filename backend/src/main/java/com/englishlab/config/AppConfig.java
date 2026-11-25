@@ -9,10 +9,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Configuración de la aplicación en un solo lugar: propiedades tipadas ({@code app.*}) y CORS
- * para el frontend React + Vite en desarrollo.
- *
- * <p>No usar {@code allowedOriginPatterns("*")} junto con {@code allowCredentials(true)}.
+ * Configuración central de propiedades tipadas y política CORS para el frontend.
+ * Se restringen orígenes explícitos para mantener compatibilidad con {@code allowCredentials(true)}.
  */
 @Configuration
 @EnableConfigurationProperties({
@@ -20,7 +18,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
         AppConfig.MailProperties.class,
         AppConfig.JwtProperties.class,
         AppConfig.VerificationProperties.class,
-        AppConfig.GoogleProperties.class
+        AppConfig.GoogleProperties.class,
+        AppConfig.TwilioVerifyProperties.class
 })
 public class AppConfig implements WebMvcConfigurer {
 
@@ -83,5 +82,17 @@ public class AppConfig implements WebMvcConfigurer {
     public record JwtProperties(
             String secret,
             @DefaultValue("3600000") long expirationMs
+    ) {}
+
+    /**
+     * Recuperación de contraseña por SMS con Twilio Verify API. Las credenciales siempre
+     * provienen de variables de entorno; con {@code enabled=false} no se realiza ninguna llamada.
+     */
+    @ConfigurationProperties(prefix = "twilio.verify")
+    public record TwilioVerifyProperties(
+            @DefaultValue("false") boolean enabled,
+            @DefaultValue("") String accountSid,
+            @DefaultValue("") String authToken,
+            @DefaultValue("") String serviceSid
     ) {}
 }

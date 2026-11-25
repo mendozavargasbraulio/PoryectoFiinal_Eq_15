@@ -77,6 +77,14 @@ public final class AppExceptions {
         }
     }
 
+    /** Recuperación por SMS desactivada o sin credenciales de Twilio Verify -> HTTP 503. */
+    public static class SmsVerificationUnavailableException extends RuntimeException {
+
+        public SmsVerificationUnavailableException(String message) {
+            super(message);
+        }
+    }
+
     /** Error de un campo concreto (array `fieldErrors` de la respuesta de validación). */
     public record ApiFieldError(String field, String message) {}
 }
