@@ -84,6 +84,19 @@ public class AssignmentService {
         assignment.setActivity(activity);
         assignment.setStatus(AssignmentStatus.PENDING);
         assignment.setAssignedAt(Instant.now());
+        assignment.setDueAt(request.dueAt());
+        assignment = assignmentRepository.save(assignment);
+        return toResponse(assignment);
+    }
+
+    @Transactional
+    public AssignmentResponse updateDueDate(Long teacherId, Long assignmentId, Instant dueAt) {
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new NotFoundException("Asignación no encontrada"));
+        if (!assignment.getTeacher().getId().equals(teacherId)) {
+            throw new AccessDeniedException("No tienes permiso para modificar esta asignación");
+        }
+        assignment.setDueAt(dueAt);
         assignment = assignmentRepository.save(assignment);
         return toResponse(assignment);
     }
@@ -173,9 +186,12 @@ public class AssignmentService {
         return new AssignmentResponse(
                 assignment.getId(),
                 assignment.getStudent().getId(),
+                assignment.getStudent().getName(),
                 assignment.getActivity().getId(),
+                assignment.getActivity().getTitle(),
                 assignment.getStatus().name(),
                 assignment.getAssignedAt(),
+                assignment.getDueAt(),
                 assignment.getCompletedAt());
     }
 
@@ -195,6 +211,7 @@ public class AssignmentService {
                 activity.getId(),
                 assignment.getStatus().name(),
                 assignment.getAssignedAt(),
+                assignment.getDueAt(),
                 assignment.getCompletedAt(),
                 assignment.getTeacher() == null ? null : assignment.getTeacher().getName(),
                 activityDetail);

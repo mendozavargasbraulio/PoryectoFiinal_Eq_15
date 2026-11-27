@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * DTOs de la gestión de usuarios por el ADMIN.
@@ -78,5 +79,12 @@ public final class UserDtos {
             int totalAttempts,
             long completedAssignments,
             long pendingAssignments
+    ) {}
+
+    public record TeacherSummaryResponse(Long id, String name, String email) {}
+
+    public record StudentClassResponse(
+            TeacherSummaryResponse currentTeacher,
+            List<TeacherSummaryResponse> availableTeachers
     ) {}
 }

@@ -3,8 +3,10 @@ package com.englishlab.service;
 import com.englishlab.domain.MasteryConfig;
 import com.englishlab.domain.MasteryService;
 import com.englishlab.dto.PageResponse;
+import com.englishlab.dto.UserDtos.StudentClassResponse;
 import com.englishlab.dto.UserDtos.StudentOverviewResponse;
 import com.englishlab.dto.UserDtos.StudentResponse;
+import com.englishlab.dto.UserDtos.TeacherSummaryResponse;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
 import com.englishlab.exception.AppExceptions.NotFoundException;
 import com.englishlab.model.entity.Assignment.AssignmentStatus;
@@ -66,6 +68,53 @@ public class TeacherStudentService {
         }
         student.setTeacher(userRepository.getReferenceById(teacherId));
         return toResponse(student);
+    }
+
+    @Transactional(readOnly = true)
+    public StudentClassResponse getStudentClass(Long studentId) {
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new NotFoundException("Estudiante no encontrado"));
+        return buildClassResponse(student);
+    }
+
+    @Transactional
+    public StudentClassResponse joinTeacher(Long studentId, Long teacherId) {
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new NotFoundException("Estudiante no encontrado"));
+        if (student.getTeacher() != null) {
+            throw new BusinessRuleException("Ya estás inscrito con un profesor. Sal de la clase actual para cambiar.");
+        }
+        User teacher = userRepository.findById(teacherId)
+                .orElseThrow(() -> new NotFoundException("Profesor no encontrado"));
+        if (teacher.getRole().getName() != RoleName.TEACHER) {
+            throw new BusinessRuleException("El usuario seleccionado no es un profesor");
+        }
+        student.setTeacher(teacher);
+        userRepository.save(student);
+        return buildClassResponse(student);
+    }
+
+    @Transactional
+    public StudentClassResponse leaveTeacher(Long studentId) {
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new NotFoundException("Estudiante no encontrado"));
+        student.setTeacher(null);
+        userRepository.save(student);
+        return buildClassResponse(student);
+    }
+
+    private StudentClassResponse buildClassResponse(User student) {
+        User teacher = student.getTeacher();
+        if (teacher != null) {
+            return new StudentClassResponse(
+                    new TeacherSummaryResponse(teacher.getId(), teacher.getName(), teacher.getEmail()),
+                    List.of());
+        }
+        List<TeacherSummaryResponse> teachers = userRepository.findByRole_NameOrderByNameAsc(RoleName.TEACHER)
+                .stream()
+                .map(t -> new TeacherSummaryResponse(t.getId(), t.getName(), t.getEmail()))
+                .toList();
+        return new StudentClassResponse(null, teachers);
     }
 
     @Transactional(readOnly = true)

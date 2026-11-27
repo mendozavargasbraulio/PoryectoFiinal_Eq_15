@@ -116,6 +116,7 @@ export default function StudentHome() {
                     <b>{t.activity?.title || 'Actividad asignada'}</b>
                     <div className="smallprint">
                       {t.teacherName || 'Profesor'} · {formatAssignedDate(t.assignedAt)}
+                      {t.dueAt ? ` · Entrega: ${formatAssignedDate(t.dueAt)}` : ''}
                     </div>
                   </div>
                   <div className="btn-row">

@@ -50,6 +50,9 @@ public class Assignment {
     @Column(name = "assigned_at", nullable = false)
     private Instant assignedAt;
 
+    @Column(name = "due_at")
+    private Instant dueAt;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

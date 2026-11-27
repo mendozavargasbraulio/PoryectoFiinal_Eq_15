@@ -354,6 +354,8 @@ function UserModal({ user, teachers, busy, onClose, onSave }) {
             value={values.email}
             onChange={handleChange}
             onBlur={handleBlur}
+            disabled={!isNew}
+            help={!isNew ? 'El correo electrónico no se puede modificar.' : ''}
             error={touched.email ? errors.email : ''}
           />
           <Input
@@ -376,6 +378,7 @@ function UserModal({ user, teachers, busy, onClose, onSave }) {
               value={values.role}
               onChange={handleChange}
               onBlur={handleBlur}
+              disabled={!isNew}
             >
               <option value="">Selecciona…</option>
               {ROLES.map((r) => (
@@ -384,6 +387,7 @@ function UserModal({ user, teachers, busy, onClose, onSave }) {
                 </option>
               ))}
             </select>
+            {!isNew ? <p className="help">El rol no se puede modificar al editar.</p> : null}
             {touched.role && errors.role ? <p className="error" role="alert">{errors.role}</p> : null}
           </div>
           {values.role === 'STUDENT' ? (

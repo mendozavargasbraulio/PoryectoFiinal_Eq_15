@@ -16,15 +16,24 @@ public final class AssignmentDtos {
             Long studentId,
 
             @NotNull(message = "La actividad es obligatoria")
-            Long activityId
+            Long activityId,
+
+            Instant dueAt
+    ) {}
+
+    public record AssignmentUpdateRequest(
+            Instant dueAt
     ) {}
 
     public record AssignmentResponse(
             Long id,
             Long studentId,
+            String studentName,
             Long activityId,
+            String activityTitle,
             String status,
             Instant assignedAt,
+            Instant dueAt,
             Instant completedAt
     ) {}
 
@@ -34,6 +43,7 @@ public final class AssignmentDtos {
             Long activityId,
             String status,
             Instant assignedAt,
+            Instant dueAt,
             Instant completedAt,
             String teacherName,
             ActivityDtos.ActivityStudentDetailDto activity

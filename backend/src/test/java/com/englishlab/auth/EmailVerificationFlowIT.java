@@ -109,19 +109,18 @@ class EmailVerificationFlowIT {
     }
 
     @Test
-    void register_withExistingEmail_returnsSameResponse_noEnumeration() {
+    void register_withExistingEmail_isRejectedWith422() {
         String email = newEmail();
         ResponseEntity<Map> first = register("Ana", email);
         ResponseEntity<Map> second = register("Otra Ana", email);
 
-        assertThat(second.getStatusCode()).isEqualTo(first.getStatusCode());
-        assertThat(second.getBody()).isEqualTo(first.getBody());
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(jdbc.queryForObject("select count(*) from users where lower(email) = ?", Integer.class, email)).isEqualTo(1);
 
         // También con una cuenta ya verificada (p. ej. el admin del seed)
         ResponseEntity<Map> verified = register("Intruso", "admin@englishlab.com");
-        assertThat(verified.getStatusCode()).isEqualTo(first.getStatusCode());
-        assertThat(verified.getBody()).isEqualTo(first.getBody());
+        assertThat(verified.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     @Test

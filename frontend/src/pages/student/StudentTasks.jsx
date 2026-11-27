@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, ErrorState, PageHeader, Spinner } from '../../components/ui.jsx';
+import ConfirmModal from '../../components/ConfirmModal.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import { useRemote, REMOTE_STATUS } from '../../api/useRemote.js';
-import { listAssignments, listObjectives, getPracticeSession } from '../../api/learning.js';
+import {
+  listAssignments,
+  listObjectives,
+  getPracticeSession,
+  getMyClass,
+  joinTeacher,
+  leaveClass,
+} from '../../api/learning.js';
 import { extractApiError } from '../../api/client.js';
 import { activityTypeLabel, skillLabel } from '../../lib/constants.js';
 
@@ -42,7 +50,13 @@ function formatDate(iso) {
   return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
 }
 
-/** "Mis tareas" → GET /me/assignments (paginado en servidor);
+function isOverdue(dueAt, status) {
+  if (!dueAt || COMPLETED.includes(status)) return false;
+  const d = new Date(dueAt);
+  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now();
+}
+
+/** "Mis tareas" → GET /me/assignments + gestión de clase (/me/class);
  *  "Práctica libre" → GET /me/objectives con inicio directo de sesión. */
 export default function StudentTasks() {
   const navigate = useNavigate();
@@ -50,6 +64,9 @@ export default function StudentTasks() {
   const [tab, setTab] = useState('tasks');
   const [page, setPage] = useState(0);
   const [startingId, setStartingId] = useState(null);
+  const [joiningId, setJoiningId] = useState(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const { status, data, error, reload } = useRemote({
     fetcher: () =>
@@ -58,6 +75,16 @@ export default function StudentTasks() {
         : listObjectives(),
     deps: [tab, page],
   });
+
+  const myClass = useRemote({
+    fetcher: () => getMyClass(),
+    deps: [tab],
+  });
+
+  const currentTeacher = myClass.data?.currentTeacher || null;
+  const availableTeachers = Array.isArray(myClass.data?.availableTeachers)
+    ? myClass.data.availableTeachers
+    : [];
 
   const raw = Array.isArray(data) ? data : data?.content || [];
   const totalPages = Math.max(1, data?.totalPages || 1);
@@ -74,6 +101,7 @@ export default function StudentTasks() {
           activityTitle: a.activity?.title || 'Actividad asignada',
           status: a.status,
           assignedAt: a.assignedAt,
+          dueAt: a.dueAt,
           completedAt: a.completedAt,
           teacherName: a.teacherName,
         };
@@ -95,6 +123,36 @@ export default function StudentTasks() {
   function switchTab(nextTab) {
     setTab(nextTab);
     setPage(0);
+  }
+
+  async function handleJoinTeacher(teacher) {
+    if (joiningId != null) return;
+    setJoiningId(teacher.id);
+    try {
+      await joinTeacher(teacher.id);
+      showToast(`Te uniste a la clase de ${teacher.name}.`);
+      myClass.reload();
+      reload();
+    } catch (err) {
+      showToast(extractApiError(err).detail || 'No se pudo unir a la clase.');
+    } finally {
+      setJoiningId(null);
+    }
+  }
+
+  async function handleConfirmLeave() {
+    setLeaving(true);
+    try {
+      await leaveClass();
+      showToast('Saliste de la clase.');
+      setShowLeaveConfirm(false);
+      myClass.reload();
+      reload();
+    } catch (err) {
+      showToast(extractApiError(err).detail || 'No se pudo salir de la clase.');
+    } finally {
+      setLeaving(false);
+    }
   }
 
   function openTask(row) {
@@ -163,6 +221,58 @@ export default function StudentTasks() {
         </button>
       </div>
 
+      {tab === 'tasks' && myClass.status === REMOTE_STATUS.real ? (
+        currentTeacher ? (
+          <div className="card light class-card">
+            <div className="class-bar">
+              <div>
+                <div className="stat-label">Tu clase actual</div>
+                <b>{currentTeacher.name}</b>
+                {currentTeacher.email ? <span className="smallprint"> · {currentTeacher.email}</span> : null}
+              </div>
+              <button
+                className="btn alt small"
+                type="button"
+                onClick={() => setShowLeaveConfirm(true)}
+              >
+                Salir de la clase
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="card light class-card">
+            <h3 className="card-title" style={{ marginBottom: 4 }}>
+              Profesores disponibles
+            </h3>
+            <p className="card-sub" style={{ marginTop: 0, marginBottom: 10 }}>
+              Aún no tienes profesor asignado. Únete a una clase para recibir tareas.
+            </p>
+            {availableTeachers.length ? (
+              availableTeachers.map((teacher) => (
+                <div className="teacher-suggestion" key={teacher.id}>
+                  <div>
+                    <b>{teacher.name}</b>
+                    {teacher.email ? <div className="smallprint">{teacher.email}</div> : null}
+                  </div>
+                  <button
+                    className="btn small"
+                    type="button"
+                    disabled={joiningId != null}
+                    onClick={() => handleJoinTeacher(teacher)}
+                  >
+                    {joiningId === teacher.id ? 'Uniéndote…' : 'Unirse'}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="muted" style={{ marginBottom: 0 }}>
+                No hay profesores disponibles por el momento.
+              </p>
+            )}
+          </div>
+        )
+      ) : null}
+
       {status === REMOTE_STATUS.error ? (
         <ErrorState message={error?.detail} onRetry={reload} />
       ) : status === REMOTE_STATUS.loading ? (
@@ -179,6 +289,7 @@ export default function StudentTasks() {
                       <th>Tipo</th>
                       <th>Estado</th>
                       <th>Asignada</th>
+                      <th>Fecha de entrega</th>
                       <th>Acción</th>
                     </>
                   ) : (
@@ -196,29 +307,43 @@ export default function StudentTasks() {
               <tbody>
                 {tab === 'tasks' ? (
                   taskRows.length ? (
-                    taskRows.map((r) => (
-                      <tr key={r.id}>
-                        <td>
-                          {r.activityTitle}
-                          {r.teacherName ? <div className="smallprint">{r.teacherName}</div> : null}
-                        </td>
-                        <td><Badge color="gray">{activityTypeLabel(r.activity?.type)}</Badge></td>
-                        <td>
-                          <Badge color={COMPLETED.includes(r.status) ? 'green' : 'gold'}>
-                            {COMPLETED.includes(r.status) ? 'Completada' : 'Pendiente'}
-                          </Badge>
-                        </td>
-                        <td>{formatDate(r.assignedAt)}</td>
-                        <td>
-                          <button className="btn small" type="button" onClick={() => openTask(r)}>
-                            {COMPLETED.includes(r.status) ? 'Ver resultado' : 'Resolver'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    taskRows.map((r) => {
+                      const overdue = isOverdue(r.dueAt, r.status);
+                      return (
+                        <tr key={r.id}>
+                          <td>
+                            {r.activityTitle}
+                            {r.teacherName ? <div className="smallprint">{r.teacherName}</div> : null}
+                          </td>
+                          <td><Badge color="gray">{activityTypeLabel(r.activity?.type)}</Badge></td>
+                          <td>
+                            <Badge color={COMPLETED.includes(r.status) ? 'green' : 'gold'}>
+                              {COMPLETED.includes(r.status) ? 'Completada' : 'Pendiente'}
+                            </Badge>
+                          </td>
+                          <td>{formatDate(r.assignedAt)}</td>
+                          <td>
+                            {r.dueAt ? (
+                              overdue ? (
+                                <Badge color="red">Vencida · {formatDate(r.dueAt)}</Badge>
+                              ) : (
+                                formatDate(r.dueAt)
+                              )
+                            ) : (
+                              <span className="muted">Sin fecha</span>
+                            )}
+                          </td>
+                          <td>
+                            <button className="btn small" type="button" onClick={() => openTask(r)}>
+                              {COMPLETED.includes(r.status) ? 'Ver resultado' : 'Resolver'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={5}><span className="muted">No hay tareas asignadas.</span></td>
+                      <td colSpan={6}><span className="muted">No hay tareas asignadas.</span></td>
                     </tr>
                   )
                 ) : objectiveRows.length ? (
@@ -290,6 +415,20 @@ export default function StudentTasks() {
           ) : null}
         </>
       )}
+
+      <ConfirmModal
+        open={showLeaveConfirm}
+        title="Salir de la clase"
+        description={
+          currentTeacher
+            ? `Dejarás de estar inscrito con ${currentTeacher.name} y podrás unirte con otro profesor cuando quieras.`
+            : 'Dejarás tu clase actual.'
+        }
+        confirmLabel="Salir de la clase"
+        busy={leaving}
+        onConfirm={handleConfirmLeave}
+        onCancel={() => setShowLeaveConfirm(false)}
+      />
     </>
   );
 }

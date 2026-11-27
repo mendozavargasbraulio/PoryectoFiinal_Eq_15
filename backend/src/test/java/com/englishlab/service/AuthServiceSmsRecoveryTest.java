@@ -10,14 +10,18 @@ import static org.mockito.Mockito.when;
 import com.englishlab.config.AppConfig.AuthProperties;
 import com.englishlab.dto.AuthDtos.ForgotPasswordSmsRequest;
 import com.englishlab.dto.AuthDtos.MessageResponse;
+import com.englishlab.dto.AuthDtos.RegisterRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordSmsRequest;
+import com.englishlab.dto.AuthDtos.UserProfileResponse;
 import com.englishlab.exception.AppExceptions.BadRequestException;
+import com.englishlab.exception.AppExceptions.BusinessRuleException;
 import com.englishlab.model.entity.User;
 import com.englishlab.repository.PasswordResetTokenRepository;
 import com.englishlab.repository.RevokedTokenRepository;
 import com.englishlab.repository.RoleRepository;
 import com.englishlab.repository.UserRepository;
 import com.englishlab.security.JwtService;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,5 +131,38 @@ class AuthServiceSmsRecoveryTest {
                 .isInstanceOf(BadRequestException.class);
         verify(twilioVerifyService, never()).checkSmsCode(any(), any());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void register_existingEmail_throwsBusinessRuleException() {
+        when(userRepository.findByEmailIgnoreCase("student1@englishlab.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("Otra Ana", "student1@englishlab.com", "Clave#2026x", null)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Ya existe una cuenta");
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getProfile_returnsFullUserInformationIncludingTeacher() {
+        User teacher = new User();
+        teacher.setId(2L);
+        teacher.setName("Profesor Uno");
+        teacher.setEmail("teacher1@englishlab.com");
+        user.setName("Ana López");
+        user.setEmailVerified(true);
+        user.setCreatedAt(Instant.parse("2026-10-01T12:00:00Z"));
+        user.setTeacher(teacher);
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user));
+
+        UserProfileResponse profile = authService.getProfile(4L);
+
+        assertThat(profile.name()).isEqualTo("Ana López");
+        assertThat(profile.email()).isEqualTo("student1@englishlab.com");
+        assertThat(profile.phone()).isEqualTo("+529511234567");
+        assertThat(profile.emailVerified()).isTrue();
+        assertThat(profile.teacherName()).isEqualTo("Profesor Uno");
+        assertThat(profile.teacherEmail()).isEqualTo("teacher1@englishlab.com");
     }
 }
