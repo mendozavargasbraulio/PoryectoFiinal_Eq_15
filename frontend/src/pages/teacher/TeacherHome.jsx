@@ -180,7 +180,7 @@ export default function TeacherHome() {
 
       <div className="card mt">
         <h3 className="card-title">Acciones</h3>
-        <div className="grid g4">
+        <div className="teacher-actions">
           <button className="btn coffee-outline" type="button" onClick={() => navigate('/actividades/nueva')}>
             Crear actividad
           </button>

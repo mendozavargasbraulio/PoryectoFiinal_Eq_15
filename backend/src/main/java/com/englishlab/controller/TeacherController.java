@@ -2,6 +2,7 @@ package com.englishlab.controller;
 
 import com.englishlab.dto.AssignmentDtos.AssignmentCreateRequest;
 import com.englishlab.dto.AssignmentDtos.AssignmentResponse;
+import com.englishlab.dto.AssignmentDtos.AssignmentUpdateRequest;
 import com.englishlab.dto.ObjectiveDtos.ProgressResponse;
 import com.englishlab.dto.PageResponse;
 import com.englishlab.dto.UserDtos.AssignStudentRequest;
@@ -21,6 +22,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TeacherController {
 
     private static final Set<String> STUDENT_SORT = Set.of("id", "name", "email", "createdAt");
-    private static final Set<String> ASSIGNMENT_SORT = Set.of("id", "assignedAt", "completedAt", "status");
+    private static final Set<String> ASSIGNMENT_SORT = Set.of("id", "assignedAt", "dueAt", "completedAt", "status");
 
     private final TeacherStudentService teacherStudentService;
     private final AssignmentService assignmentService;
@@ -97,5 +99,13 @@ public class TeacherController {
             @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody AssignmentCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(assignmentService.create(principal.id(), request));
+    }
+
+    @PutMapping("/assignments/{id}")
+    public ResponseEntity<AssignmentResponse> updateAssignmentDueDate(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long id,
+            @RequestBody AssignmentUpdateRequest request) {
+        return ResponseEntity.ok(assignmentService.updateDueDate(principal.id(), id, request == null ? null : request.dueAt()));
     }
 }

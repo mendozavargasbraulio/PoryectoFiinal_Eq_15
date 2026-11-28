@@ -47,3 +47,15 @@ export function listObjectives() {
 export function getPracticeSession(objectiveId, { size = 10 } = {}) {
   return client.get(`/me/objectives/${objectiveId}/practice-session`, { params: { size } });
 }
+
+export function getMyClass() {
+  return client.get('/me/class');
+}
+
+export function joinTeacher(teacherId) {
+  return client.post(`/me/class/${teacherId}`);
+}
+
+export function leaveClass() {
+  return client.delete('/me/class');
+}

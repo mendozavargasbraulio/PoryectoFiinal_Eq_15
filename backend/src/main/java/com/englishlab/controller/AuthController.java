@@ -11,6 +11,7 @@ import com.englishlab.dto.AuthDtos.RegisterRequest;
 import com.englishlab.dto.AuthDtos.ResendVerificationRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordSmsRequest;
+import com.englishlab.dto.AuthDtos.UserProfileResponse;
 import com.englishlab.dto.AuthDtos.VerifyEmailRequest;
 import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.AuthService;
@@ -19,6 +20,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -71,6 +73,11 @@ public class AuthController {
             return ResponseEntity.ok(result.session());
         }
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(result.pending());
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserProfileResponse> me(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(authService.getProfile(principal.id()));
     }
 
     @PostMapping("/logout")

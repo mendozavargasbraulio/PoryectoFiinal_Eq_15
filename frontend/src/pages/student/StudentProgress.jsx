@@ -143,7 +143,7 @@ export default function StudentProgress() {
               starting?.objectiveId === o.objectiveId && starting.challengeSeconds != null;
             const challengeOpen = challengeFor === o.objectiveId;
             return (
-              <div key={o.objectiveId}>
+              <div key={o.objectiveId} className="objective-item">
                 <div className="barline">
                   <b>{o.code ? `${o.code} — ${o.name}` : o.name}</b>
                   <span>{Math.round(Number(o.mastery || 0) * 100)}%</span>

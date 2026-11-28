@@ -10,12 +10,14 @@ import com.englishlab.dto.ObjectiveDtos.ObjectiveStateResponse;
 import com.englishlab.dto.ObjectiveDtos.PracticeSessionResponse;
 import com.englishlab.dto.ObjectiveDtos.RecommendationResponse;
 import com.englishlab.dto.PageResponse;
+import com.englishlab.dto.UserDtos.StudentClassResponse;
 import com.englishlab.security.JwtService.AuthenticatedUser;
 import com.englishlab.service.ActivityService;
 import com.englishlab.service.AssignmentService;
 import com.englishlab.service.AttemptService;
 import com.englishlab.service.ObjectiveStateService;
 import com.englishlab.service.RecommendationService;
+import com.englishlab.service.TeacherStudentService;
 import com.englishlab.util.PageableFactory;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Set;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,25 +44,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class StudentController {
 
     private static final Set<String> ACTIVITY_SORT = Set.of("id", "title", "type", "level");
-    private static final Set<String> ASSIGNMENT_SORT = Set.of("id", "status", "assignedAt");
+    private static final Set<String> ASSIGNMENT_SORT = Set.of("id", "status", "assignedAt", "dueAt");
 
     private final ObjectiveStateService objectiveStateService;
     private final ActivityService activityService;
     private final RecommendationService recommendationService;
     private final AttemptService attemptService;
     private final AssignmentService assignmentService;
+    private final TeacherStudentService teacherStudentService;
 
     public StudentController(
             ObjectiveStateService objectiveStateService,
             ActivityService activityService,
             RecommendationService recommendationService,
             AttemptService attemptService,
-            AssignmentService assignmentService) {
+            AssignmentService assignmentService,
+            TeacherStudentService teacherStudentService) {
         this.objectiveStateService = objectiveStateService;
         this.activityService = activityService;
         this.recommendationService = recommendationService;
         this.attemptService = attemptService;
         this.assignmentService = assignmentService;
+        this.teacherStudentService = teacherStudentService;
     }
 
     @GetMapping("/me/objectives")
@@ -135,5 +141,22 @@ public class StudentController {
             @PathVariable Long assignmentId,
             @AuthenticationPrincipal AuthenticatedUser principal) {
         return ResponseEntity.ok(attemptService.getAssignmentResult(principal.id(), assignmentId));
+    }
+
+    @GetMapping("/me/class")
+    public ResponseEntity<StudentClassResponse> myClass(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(teacherStudentService.getStudentClass(principal.id()));
+    }
+
+    @PostMapping("/me/class/{teacherId}")
+    public ResponseEntity<StudentClassResponse> joinClass(
+            @PathVariable Long teacherId,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(teacherStudentService.joinTeacher(principal.id(), teacherId));
+    }
+
+    @DeleteMapping("/me/class")
+    public ResponseEntity<StudentClassResponse> leaveClass(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(teacherStudentService.leaveTeacher(principal.id()));
     }
 }

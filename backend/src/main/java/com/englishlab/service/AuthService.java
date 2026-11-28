@@ -10,12 +10,14 @@ import com.englishlab.dto.AuthDtos.RegisterRequest;
 import com.englishlab.dto.AuthDtos.ResendVerificationRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordRequest;
 import com.englishlab.dto.AuthDtos.ResetPasswordSmsRequest;
+import com.englishlab.dto.AuthDtos.UserProfileResponse;
 import com.englishlab.dto.AuthDtos.UserResponse;
 import com.englishlab.dto.AuthDtos.VerifyEmailRequest;
 import com.englishlab.exception.AppExceptions.BadRequestException;
 import com.englishlab.exception.AppExceptions.BusinessRuleException;
 import com.englishlab.exception.AppExceptions.EmailNotVerifiedException;
 import com.englishlab.exception.AppExceptions.InvalidCredentialsException;
+import com.englishlab.exception.AppExceptions.NotFoundException;
 import com.englishlab.model.entity.PasswordResetToken;
 import com.englishlab.model.entity.RevokedToken;
 import com.englishlab.model.entity.Role;
@@ -106,10 +108,7 @@ public class AuthService {
 
         Optional<User> existing = userRepository.findByEmailIgnoreCase(email);
         if (existing.isPresent()) {
-            // Cuenta pendiente: reenvía el enlace (con límites). Cuenta verificada: no hace nada.
-            // Nunca se modifica la contraseña de una cuenta existente desde el registro.
-            emailVerificationService.resendIfAllowed(existing.get());
-            return new MessageResponse(REGISTRATION_MESSAGE);
+            throw new BusinessRuleException("Ya existe una cuenta registrada con ese correo electrónico.");
         }
 
         Role studentRole = roleRepository.findByName(RoleName.STUDENT)
@@ -241,6 +240,22 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
         return new MessageResponse("Contraseña actualizada correctamente.");
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+        User teacher = user.getTeacher();
+        return new UserProfileResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.isEmailVerified(),
+                user.getCreatedAt(),
+                teacher == null ? null : teacher.getName(),
+                teacher == null ? null : teacher.getEmail());
     }
 
     private UserResponse toResponse(User user) {

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 
 /**
  * DTOs de autenticación: registro, login, verificación de correo y recuperación de contraseña.
@@ -117,6 +118,17 @@ public final class AuthDtos {
     public record MessageResponse(String message) {}
 
     public record UserResponse(Long id, String name, String email, String role) {}
+
+    public record UserProfileResponse(
+            Long id,
+            String name,
+            String email,
+            String phone,
+            boolean emailVerified,
+            Instant createdAt,
+            String teacherName,
+            String teacherEmail
+    ) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 }
