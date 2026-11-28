@@ -1,0 +1,28 @@
+meta {
+  name: 05 - Login con datos invalidos (400)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "",
+    "password": ""
+  }
+}
+
+tests {
+  test("El backend valida los campos obligatorios", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+}
