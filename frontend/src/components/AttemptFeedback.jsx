@@ -16,21 +16,13 @@ function formatAnswer(value, activityType, options) {
   return String(found.id) === String(found.text) ? String(found.text) : `${found.id} — ${found.text}`;
 }
 
-/** Calificación del intento en porcentaje. El servidor manda `score` (0–1 en
- *  NORMAL, 1.0 / −0.5 / 0.0 en RETO): se acota a 0–1 y se redondea. */
+/** Calificación del intento en porcentaje (acotada a 0–100%). */
 function scorePercent(result, correct) {
   const raw = result.score != null ? Number(result.score) : NaN;
   if (!Number.isFinite(raw)) return correct ? 100 : 0;
   return Math.round(Math.min(1, Math.max(0, raw)) * 100);
 }
 
-/** Cuerpo del resultado de un intento. Lo comparten StudentResult y el modo
- *  cola de StudentActivity. No calcula la corrección: pinta lo que devuelve
- *  POST /attempts ({correct, score, solution, explanation, mastery}). En
- *  MULTIPLE_CHOICE `solution` es el id de la opción correcta ("b"), así que se
- *  muestra como "<id> — <texto>". Durante la revisión de una pregunta no se
- *  muestran calificación ni dominio; el resumen (dos porcentajes) solo aparece
- *  con `showSummary`. */
 export default function AttemptFeedback({
   result = {},
   answer: rawAnswer,
@@ -47,13 +39,9 @@ export default function AttemptFeedback({
   const solution = formatAnswer(result.solution, activityType, options);
   const answerValue = result.answer ?? rawAnswer;
   const answer = formatAnswer(answerValue, activityType, options);
-  /** El servidor devuelve `answer: ''` cuando la pregunta se quedó sin
-   *  responder (RETO agotado): se muestra como "Sin respuesta". */
   const hasAnswerValue = answerValue != null;
   const pct = scorePercent(result, correct);
   const masteryPct = mastery != null ? Math.round(Number(mastery) * 100) : null;
-  /** Fallo = respuesta incorrecta o "Sin respuesta": el contenedor se tiñe con
-   *  el café del menú lateral (.feedback-wrong). El acierto no cambia. */
   const wrong = !correct;
 
   return (
@@ -61,37 +49,34 @@ export default function AttemptFeedback({
       className={`card light${wrong ? ' feedback-wrong' : ''}`}
       style={{ maxWidth: 750, margin: 'auto' }}
     >
-      {wrong ? (
-        <span className="feedback-wrong-tag">
-          {hasAnswerValue && !answer ? 'Sin respuesta' : 'Respuesta incorrecta'}
-        </span>
-      ) : null}
-      <div style={{ fontSize: 39 }}>{correct ? '✓' : '↺'}</div>
-      <h2 style={{ font: '35px Georgia, serif', margin: '12px 0' }}>
+      <p className="feedback-status-line">
+        {correct ? 'Respuesta correcta' : hasAnswerValue && !answer ? 'Sin respuesta' : 'Respuesta incorrecta'}
+      </p>
+      <h2 className="feedback-heading">
         {correct ? '¡Muy bien!' : 'Sigue practicando'}
       </h2>
       {hasAnswerValue ? (
-        answer ? (
-          <p>
-            Tu respuesta: <b>{answer}</b>
-          </p>
-        ) : (
-          <p>
+        <p className="feedback-detail">
+          {answer ? (
+            <>
+              Tu respuesta: <b>{answer}</b>
+            </>
+          ) : (
             <b>Sin respuesta</b>
-          </p>
-        )
+          )}
+        </p>
       ) : null}
       {!correct && solution ? (
-        <p>
+        <p className="feedback-detail">
           Respuesta correcta: <b>{solution}</b>
         </p>
       ) : null}
-      <div className="notice">
-        <span>
-          <b>Explicación:</b>{' '}
+      <div className="feedback-note">
+        <b>Explicación</b>
+        <p>
           {explanation ||
             'Revisa la explicación de la actividad y vuelve a intentarlo: cada intento ajusta tu dominio del objetivo.'}
-        </span>
+        </p>
       </div>
       {showSummary ? (
         <>

@@ -1,7 +1,9 @@
 package com.englishlab.repository;
 
+import com.englishlab.model.entity.Role.RoleName;
 import com.englishlab.model.entity.User;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +28,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Optional<User> findByEmailIgnoreCase(String email);
 
     Optional<User> findByPhone(String phone);
+
+    List<User> findByRole_NameOrderByNameAsc(RoleName roleName);
 
     boolean existsByEmailIgnoreCase(String email);
 

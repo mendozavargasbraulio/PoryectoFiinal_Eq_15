@@ -92,20 +92,14 @@ public class AdminUserService {
     public UserAdminResponse update(Long id, UserAdminRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-        String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
-            throw new BusinessRuleException("El email ya está registrado");
-        }
-        Role role = requireRole(request.role());
 
+        // En edición se conservan el correo electrónico y el rol originales del usuario.
         user.setName(request.name().trim());
-        user.setEmail(email);
-        user.setRole(role);
         user.setPhone(request.phone());
         if (request.password() != null && !request.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
-        if (request.teacherId() != null && role.getName() == RoleName.STUDENT) {
+        if (request.teacherId() != null && user.getRole().getName() == RoleName.STUDENT) {
             user.setTeacher(resolveTeacher(request.teacherId()));
         } else {
             user.setTeacher(null);

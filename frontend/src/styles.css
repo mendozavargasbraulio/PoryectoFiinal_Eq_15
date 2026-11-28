@@ -192,6 +192,9 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+  text-align: center;
+  line-height: 1.3;
+  white-space: normal;
 }
 .btn:hover { filter: brightness(1.12); }
 .btn.alt { background: transparent; color: var(--graphite); }
@@ -240,6 +243,26 @@ a:hover { text-decoration: underline; }
 }
 .input:focus { outline: 2px solid #b8a879; }
 .input.invalid { border-color: var(--rust); }
+.input:disabled { opacity: 0.72; cursor: not-allowed; background: var(--paper); }
+.input.has-eye { padding-right: 42px; }
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+}
+.input-eye:hover:not(:disabled) { color: var(--graphite); background: rgba(80, 76, 64, 0.08); }
 textarea.input { min-height: 95px; resize: vertical; height: auto; }
 .help { color: #797363; font-size: 11px; margin: 6px 0; }
 .error { color: var(--rust); font-size: 11px; margin: 6px 0 0; }
@@ -342,8 +365,8 @@ th {
   color: #f7f2e6;
   font-weight: 700;
 }
-th, td { padding: 14px 16px; border-bottom: 1px solid #d1cabb; }
-thead th { border-bottom-color: var(--coffee); }
+th, td { padding: 13px 16px; border-bottom: 1px solid rgba(196, 189, 168, 0.55); vertical-align: middle; }
+thead th { border-bottom: 0; }
 td { font-size: 12px; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
@@ -429,27 +452,99 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
 }
 .notice.warn { border-color: var(--rust); background: #f3e1db; }
 
-/* Resultado del intento: el acierto conserva el estilo base de la tarjeta; el
-   fallo (respuesta incorrecta o "Sin respuesta") se marca con el café del menú
-   lateral —misma variable que .side— en fondo y borde, con texto legible. */
+/* Resultado del intento: estilo limpio sin bordes gruesos de acento. */
 .card.light.feedback-wrong {
   background: var(--coffee-wash);
-  border-color: var(--coffee);
-  border-left: 6px solid var(--coffee);
+  border-color: var(--line);
 }
-.feedback-wrong .notice { border-left-color: var(--coffee); background: var(--cream); }
-.feedback-wrong-tag {
-  display: inline-block;
-  background: var(--coffee);
-  color: var(--cream);
-  font-size: 10px;
+.feedback-status-line {
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 3px;
-  margin: 0 0 12px;
+  color: var(--muted);
+  margin: 0 0 6px;
 }
+.feedback-wrong .feedback-status-line { color: var(--coffee); }
+.feedback-heading {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 14px;
+}
+.feedback-detail { margin: 6px 0; font-size: 14px; }
+.feedback-note {
+  margin-top: 16px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #e8ecdf;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.feedback-note b { display: block; margin-bottom: 4px; color: var(--graphite); }
+.feedback-note p { margin: 0; color: var(--graphite); }
+.feedback-wrong .feedback-note { background: var(--cream); }
+
+.objective-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(196, 189, 168, 0.6);
+}
+.objective-item:first-of-type { padding-top: 4px; }
+.objective-item:last-of-type { border-bottom: 0; padding-bottom: 2px; }
+
+.teacher-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 12px;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 14px 0 18px;
+}
+.profile-avatar { width: 46px; height: 46px; min-width: 46px; font-size: 15px; }
+.profile-head-text { min-width: 0; }
+.profile-head-text b { display: block; font-size: 15px; color: var(--graphite); }
+.profile-head-text span { display: block; font-size: 12px; color: var(--muted); word-break: break-word; }
+.profile-list { margin: 0; }
+.profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(196, 189, 168, 0.55);
+  font-size: 13px;
+}
+.profile-row:last-child { border-bottom: 0; }
+.profile-row dt { color: var(--muted); font-weight: 600; flex-shrink: 0; }
+.profile-row dd { margin: 0; color: var(--graphite); font-weight: 600; text-align: right; word-break: break-word; }
+
+.class-card { margin-bottom: 20px; }
+.class-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.teacher-suggestion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(196, 189, 168, 0.55);
+}
+.teacher-suggestion:last-child { border-bottom: 0; padding-bottom: 0; }
+.due-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.due-inline input[type='date'] { height: 34px; padding: 4px 8px; font-size: 12px; width: auto; }
 
 /* Reproductor: flecha de salida junto al título, sin tocar la cuenta atrás. */
 .exercise-top { display: flex; align-items: flex-start; gap: 14px; }
@@ -495,7 +590,7 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   gap: 10px;
   padding-bottom: 6px;
   margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(196, 189, 168, 0.55);
 }
 .mastery-group-head b { font-family: Georgia, serif; font-size: 19px; letter-spacing: 0.04em; }
 .mastery-row { margin-top: 11px; }
@@ -515,7 +610,7 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
 .mastery-delta-tag.down { color: #8b3e34; background: #f5ddd7; }
 .mastery-track { position: relative; height: 10px; }
 .mastery-fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--olive); border-radius: 20px; }
-.mastery-fill.blocked { background: repeating-linear-gradient(45deg, #b3a992 0 5px, #cfc6b1 5px 10px); }
+.mastery-fill.blocked { background: #c5bda8; }
 .mastery-delta { position: absolute; top: 0; bottom: 0; min-width: 2px; }
 .mastery-delta.up { background: #3c5a31; }
 .mastery-delta.down { background: var(--rust); }
@@ -711,8 +806,8 @@ tbody tr:hover { background: rgba(208, 201, 178, 0.21); }
   .side { width: 100%; max-height: none; position: static; }
   .brand { padding: 15px 18px; }
   .side .heading { display: none; }
-  .nav { display: flex; overflow: auto; gap: 7px; padding: 8px 10px; }
-  .nav button, .nav a { white-space: nowrap; padding: 9px; width: auto; }
+  .nav { display: flex; overflow-x: auto; gap: 7px; padding: 8px 10px; }
+  .nav button, .nav a { white-space: nowrap; flex-shrink: 0; padding: 9px 13px; width: auto; }
   .topbar { height: auto; padding: 13px 16px; flex-wrap: wrap; }
   .canvas { padding: 23px 14px; }
   .g2, .g3, .g4, .form-2 { grid-template-columns: 1fr; }

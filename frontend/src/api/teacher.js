@@ -22,8 +22,22 @@ export function linkStudent({ email }) {
   return client.post('/teacher/students', { email });
 }
 
-export function createAssignment({ studentId, activityId }) {
-  return client.post('/teacher/assignments', { studentId, activityId });
+export function createAssignment({ studentId, activityId, dueAt }) {
+  return client.post('/teacher/assignments', {
+    studentId,
+    activityId,
+    ...(dueAt ? { dueAt } : {}),
+  });
+}
+
+export function listTeacherAssignments({ page = 0, size = 10, sort = 'assignedAt,desc', status } = {}) {
+  return client.get('/teacher/assignments', {
+    params: { page, size, sort, ...(status ? { status } : {}) },
+  });
+}
+
+export function updateAssignmentDueDate(id, { dueAt }) {
+  return client.put(`/teacher/assignments/${id}`, { dueAt: dueAt || null });
 }
 
 export function getStudentProgress(id) {
