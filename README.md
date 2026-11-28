@@ -8,8 +8,9 @@ Aplicación web full stack para practicar gramática de inglés (niveles CEFR A1
 | Proyecto desplegado (HTTPS) | `https://english-labeq15.tech` |
 | URL base de la API | `https://english-labeq15.tech/api/v1` |
 | Prototipo de Figma | https://www.figma.com/proto/Tk9VgcMgRk0mCz2oysTGsM/Proyecto-Interfaz?node-id=7-2030&p=f&t=05j0tRsqkwrJlrEB-1&scaling=scale-down&content-scaling=fixed&page-id=0%3A1&starting-point-node-id=7%3A2030 |
-| Tablero de GitHub Projects | `PEGAR_LINK_PROJECTS` |
-| Repositorio | `PEGAR_LINK_REPO` |
+| Repositorio | https://github.com/users/mendozavargasbraulio/projects/1 |
+| Tablero de GitHub Projects | https://github.com/mendozavargasbraulio/PoryectoFiinal_Eq_15 |
+
 
 ## Equipo 15 
 
