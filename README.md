@@ -86,6 +86,7 @@ Rutas relativas a la raíz del repositorio. Paquete Java base: `backend/src/main
 | Correo con `JavaMailSender` → Postfix local | `…/service/NotificationService.java` (asíncrono con `@Async`, registra cada envío en `notifications_log` como `SENT` / `FAILED` / `PENDING`); `spring.mail.*` y `app.mail.*` en `application.properties.example` (host `127.0.0.1`, puerto 25, sin proveedor externo) |
 | Correos que envía la aplicación | Bienvenida, **verificación de correo** (HTML + texto, `…/service/EmailVerificationTemplate.java`) y **recuperación de contraseña** |
 
+
 ## 6. Seguridad
 | Requisito | Dónde está |
 |---|---|
@@ -108,6 +109,11 @@ Rutas relativas a la raíz del repositorio. Paquete Java base: `backend/src/main
 | Repo público, commits de ambos, README | Ver [Enlaces](#enlaces) |
 | GitHub Projects público (Backlog / To Do / In Progress / In Review / Done) | Ver [Enlaces](#enlaces) |
 | VPS: JAR con systemd, build estático, Nginx, HTTPS con Certbot | El backend corre como JAR bajo systemd, el frontend se sirve como build estático (`cd frontend && npm run build`) desde Nginx, que reenvía `/api/` al backend con HTTPS de Certbot |
+
+
+## Diseño en Figma
+- **Prototipo navegable:** [Ver en Figma](https://www.figma.com/proto/Tk9VgcMgRk0mCz2oysTGsM/Proyecto-Interfaz?node-id=7-2030&t=0lKPeRMX09tOafvJ-1&scaling=scale-down&content-scaling=fixed&page-id=0%3A1&starting-point-node-id=7%3A2030) — pantallas principales de los roles y diseño consistente en `frontend/src/styles.css`.
+- **Paleta de colores:** Tonos oliva oscuro y verde salvia (enfoque académico, calma y seguimiento de avance) combinados con fondos crema/arena cálidos y alto contraste para facilitar la lectura.
 
 ---
 
