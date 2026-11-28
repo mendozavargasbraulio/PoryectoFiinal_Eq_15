@@ -1,0 +1,21 @@
+meta {
+  name: 03 - Acceso denegado a admin (403)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/admin/users?page=0&size=5
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("Un estudiante no accede a administracion", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+}

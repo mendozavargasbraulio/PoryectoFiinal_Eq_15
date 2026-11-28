@@ -1,0 +1,42 @@
+meta {
+  name: 01 - Login correcto y JWT
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{process.env.EL_TEST_EMAIL}}",
+    "password": "{{process.env.EL_TEST_PASSWORD}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    const body = res.getBody();
+    if (body && body.token) {
+      bru.setVar('token', body.token);
+    }
+  }
+}
+
+tests {
+  test("Login exitoso responde 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("La respuesta contiene el JWT", function () {
+    const body = res.getBody();
+    expect(body).to.have.property('token').that.is.a('string').and.is.not.empty;
+    expect(body).to.have.property('user');
+  });
+}
