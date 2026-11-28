@@ -422,7 +422,7 @@ export default function AssignmentForm() {
       <form className="card light assign-card" onSubmit={handleLink} noValidate>
         <h3 className="card-title">Vincular estudiante por correo</h3>
         <p className="card-sub">
-          Agrega un alumno existente (rol ESTUDIANTE) a tu lista de estudiantes.
+          Agrega un alumno existente  a tu lista de estudiantes.
         </p>
         <Input
           label="Correo del estudiante"
